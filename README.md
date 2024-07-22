@@ -69,8 +69,6 @@ You probably don't want to just put your API keys in your configuration file.
 What I do is read a .env file in my config and use the api keys like that. If
 there is a better way let me know.
 
-```lua
-
 ## Usage
 
 elelem.nvim provides several functions to interact with your code:
