@@ -105,29 +105,27 @@ local function append_to_result_buffer(content)
 
     local winid = vim.fn.bufwinid(bufnr)
     if winid == -1 then
+      -- Create a new window for the buffer if it's not visible
+      local current_win = vim.api.nvim_get_current_win()
       vim.cmd('vsplit')
       winid = vim.api.nvim_get_current_win()
       vim.api.nvim_win_set_buf(winid, bufnr)
-    else
-      vim.api.nvim_set_current_win(winid)
+      vim.api.nvim_set_current_win(current_win) -- Return focus to the original window
     end
 
     vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
     local last_line = vim.api.nvim_buf_line_count(bufnr)
     local last_line_content = vim.api.nvim_buf_get_lines(bufnr, last_line - 1, last_line, false)[1] or ""
 
+    local content_lines = vim.split(content, "\n")
     if last_line_content ~= "" then
-      vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, { last_line_content .. content })
-    else
-      vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, { content })
+      content_lines[1] = last_line_content .. content_lines[1]
     end
+    vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, content_lines)
 
     vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
 
     vim.api.nvim_win_set_option(winid, 'wrap', true)
-
-    local new_last_line = vim.api.nvim_buf_line_count(bufnr)
-    vim.api.nvim_win_set_cursor(winid, { new_last_line, #content })
   end)
 end
 
