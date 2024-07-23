@@ -28,16 +28,9 @@ local function run_curl_with_streaming(url, method, headers, body, on_chunk)
         command = 'curl',
         args = args,
         on_stdout = function(_, data)
-            print("Data: " .. data)
             if on_chunk then
                 on_chunk(data)
             end
-        end,
-        on_stderr = function(_, data)
-            print("Error: " .. data)
-        end,
-        on_exit = function(j, return_val)
-            print("Curl job completed with exit code: " .. return_val)
         end,
     })
 
