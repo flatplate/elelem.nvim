@@ -246,4 +246,76 @@ M.set_config = function(config)
     M.config = config
 end
 
+
+--[[
+-- Groq API
+--
+curl -X POST "https://api.groq.com/openai/v1/chat/completions" \
+     -H "Authorization: Bearer $GROQ_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"messages": [{"role": "user", "content": "Explain the importance of fast language models"}], "model": "llama3-8b-8192"}'
+--
+--
+--k
+--]]
+
+M.groq = {
+    api_url = "https://api.groq.com/openai/v1/chat/completions",
+
+    request = function(model, messages, callback)
+        local api_key = M.config.providers.groq.api_key
+        curl.post(M.groq.api_url, {
+            headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = "Bearer " .. api_key
+            },
+            body = vim.fn.json_encode({
+                model = model.name,
+                messages = messages,
+                max_tokens = 1024
+            }),
+            callback = vim.schedule_wrap(function(response)
+                if response.status ~= 200 then
+                    vim.notify("API request failed with status " .. response.status .. "\n" .. response.body,
+                        vim.log.levels.ERROR)
+                    return
+                end
+                local result = vim.json.decode(response.body)
+                callback(result.choices[1].message.content)
+            end)
+        })
+    end,
+
+    stream = function(model, messages, callback)
+        local api_key = M.config.providers.groq.api_key
+        local headers = {
+            "Content-Type: application/json",
+            "Authorization: Bearer " .. api_key
+        }
+        local body = {
+            model = model.name,
+            messages = messages,
+            max_tokens = 1024,
+            stream = true
+        }
+        local stream = function(data)
+            if data then
+                local lines = vim.split(data, "\n")
+                for _, line in ipairs(lines) do
+                    if line:match("^data:") then
+                        local json_str = line:gsub("^data:%s*", "")
+                        if json_str ~= "[DONE]" then
+                            local result = vim.json.decode(json_str)
+                            if result.choices and result.choices[1].delta and result.choices[1].delta.content then
+                                callback(result.choices[1].delta.content)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        run_curl_with_streaming(M.groq.api_url, "POST", headers, body, stream)
+    end
+}
+
 return M

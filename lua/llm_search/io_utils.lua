@@ -99,11 +99,52 @@ local function display_in_result_buffer(content)
   vim.api.nvim_win_set_cursor(winid, { 1, 0 })
 end
 
+local function append_to_result_buffer(content)
+  vim.schedule(function()
+    local bufnr = get_result_buffer()
+
+    local winid = vim.fn.bufwinid(bufnr)
+    if winid == -1 then
+      vim.cmd('vsplit')
+      winid = vim.api.nvim_get_current_win()
+      vim.api.nvim_win_set_buf(winid, bufnr)
+    else
+      vim.api.nvim_set_current_win(winid)
+    end
+
+    vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
+    local last_line = vim.api.nvim_buf_line_count(bufnr)
+    local last_line_content = vim.api.nvim_buf_get_lines(bufnr, last_line - 1, last_line, false)[1] or ""
+
+    if last_line_content ~= "" then
+      vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, { last_line_content .. content })
+    else
+      vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, { content })
+    end
+
+    vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
+
+    vim.api.nvim_win_set_option(winid, 'wrap', true)
+
+    local new_last_line = vim.api.nvim_buf_line_count(bufnr)
+    vim.api.nvim_win_set_cursor(winid, { new_last_line, #content })
+  end)
+end
+
+local function clear_result_buffer()
+  local bufnr = get_result_buffer()
+  vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+  vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
+end
+
 local M = {
   popup_input = popup_input,
   print_to_split = print_to_split,
   get_result_buffer = get_result_buffer,
   display_in_result_buffer = display_in_result_buffer,
+  append_to_result_buffer = append_to_result_buffer,
+  clear_result_buffer = clear_result_buffer,
 }
 
 return M

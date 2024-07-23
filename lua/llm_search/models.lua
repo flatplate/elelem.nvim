@@ -49,4 +49,63 @@ M.gpt4o = {
     supports_system_message = true
 }
 
+M.llama_3_1_405B = {
+    name = "llama-3.1-405b-reasoning",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.llama_3_1_70B = {
+    name = "llama-3.1-70b-versatile",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.llama_3_1_8B = {
+    name = "llama-3.1-8b-instant",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.llama_3_groq_70B = {
+    name = "llama3-groq-70b-8192-tool-use-preview",
+    provider = providers.groq,
+    supports_system_message = true
+}
+M.llama_3_groq_8B = {
+    name = "llama3-groq-8b-8192-tool-use-preview",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.meta_llama_3_70B = {
+    name = "llama3-70b-8192",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.meta_llama_3_8B = {
+    name = "llama3-8b-8192",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.mixtral_8x7B = {
+    name = "mixtral-8x7b-32768",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.gemma_7B = {
+    name = "gemma-7b-it",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
+M.gemma_2_9B = {
+    name = "gemma2-9b-it",
+    provider = providers.groq,
+    supports_system_message = true
+}
+
 return M

@@ -10,6 +10,7 @@ local DEFAULT_MODEL = models.deepseek
 local DEFAULT_APPEND_MODEL = models.deepseek_base
 local CONTEXT_LINES = 8 -- Number of lines to extract before and after each quickfix item
 
+local config -- Config from the setup function
 local plenary_path = require('plenary.path')
 local log_path = plenary_path:new(vim.fn.stdpath('cache')):joinpath('quickfix_llm_search.log')
 
@@ -39,12 +40,11 @@ function M.search_quickfix(custom_prompt, model)
         return
       end
 
+      io_utils.clear_result_buffer()
       -- Show a "loading" message
-      io_utils.display_in_result_buffer("Loading...\nPlease wait while the LLM processes your query.")
+      io_utils.display_in_result_buffer("Model: " .. model.name .. "\n\nContext:\n" .. context .. "\n\n>> ")
 
-      llm_utils.query_llm(context, query, custom_prompt, function(result)
-        io_utils.display_in_result_buffer(result)
-      end, false, model)
+      llm_utils.stream_llm(context, query, custom_prompt, io_utils.append_to_result_buffer, model)
     else
       print("No query entered")
     end
@@ -74,7 +74,6 @@ function M.append_llm_output(custom_prompt, model)
   model = model or DEFAULT_APPEND_MODEL
   log.debug("Starting append_llm_output function")
   local bufnr = vim.api.nvim_get_current_buf()
-  local filename = vim.api.nvim_buf_get_name(bufnr)
   local cursor = vim.api.nvim_win_get_cursor(0)
 
   local row, col = cursor[1], cursor[2]
@@ -99,19 +98,11 @@ function M.search_current_file(custom_prompt, model, debug)
     if query and query ~= "" then
       local context = file_utils.get_current_file_content()
 
+      io_utils.clear_result_buffer()
       -- Show a "loading" message
-      io_utils.display_in_result_buffer("Loading...\nPlease wait while the LLM processes your query.")
+      io_utils.display_in_result_buffer("Model: " .. model.name .. "\n\nContext:\n" .. context .. "\n\n>> ")
 
-      if debug then
-        local debug_content = "System Message:\n" ..
-            (custom_prompt or "") .. "\n\nContext:\n" .. context .. "\n\nQuery: " .. query
-        io_utils.display_in_result_buffer(debug_content)
-        return
-      end
-
-      llm_utils.query_llm(context, query, custom_prompt, function(result)
-        io_utils.display_in_result_buffer(result)
-      end, false, model)
+      llm_utils.stream_llm(context, query, custom_prompt, io_utils.append_to_result_buffer, model)
     else
       print("No query entered")
     end
@@ -135,18 +126,11 @@ function M.search_visual_selection(custom_prompt, model, debug)
 
   io_utils.popup_input(function(query)
     if query and query ~= "" then
-      io_utils.display_in_result_buffer("Loading...\nPlease wait while the LLM processes your query.")
+      -- Show a "loading" message
+      io_utils.clear_result_buffer()
+      io_utils.display_in_result_buffer("Model: " .. model.name .. "\n\nContext:\n" .. context .. "\n\n>> ")
 
-      if debug then
-        local debug_content = "System Message:\n" ..
-            (custom_prompt or "") .. "\n\nContext:\n" .. context .. "\n\nQuery: " .. query
-        io_utils.display_in_result_buffer(debug_content)
-        return
-      end
-
-      llm_utils.query_llm(context, query, custom_prompt, function(result)
-        io_utils.display_in_result_buffer(result)
-      end, false, model)
+      llm_utils.stream_llm(context, query, custom_prompt, io_utils.append_to_result_buffer, model)
     else
       print("No query entered")
     end
@@ -180,13 +164,21 @@ function M.append_llm_output_visual(custom_prompt, model)
   end)
 end
 
+--[[
+--New concept of agents
+--Agents are a way to define a set of models and prompts that can be used to search, append, or stream LLM output
+--You can use the agent when you are calling the search_quickfix, search_current_file, append_llm_output, append_llm_output_visual, search_visual_selection functions
+--There should also be a telescope picker to select the agent
+--]]
+
+
 function M.open_log_file()
   vim.cmd('edit ' .. log_path.filename)
 end
 
 M.setup = function(opts)
-  M.config = opts or {}
-  providers.set_config(M.config)
+  config = opts
+  providers.set_config(opts)
 end
 
 M.models = models
