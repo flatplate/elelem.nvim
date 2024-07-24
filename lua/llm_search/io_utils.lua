@@ -36,13 +36,6 @@ local function popup_input(callback)
   end)
 end
 
--- Function to create a new split and print content
-local function print_to_split(content)
-  vim.cmd("vnew")
-  local buf = vim.api.nvim_get_current_buf()
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(content, "\n"))
-end
-
 -- Global variable to store the buffer number
 local result_bufnr = nil
 
@@ -64,6 +57,7 @@ local function get_result_buffer()
   vim.api.nvim_buf_set_option(result_bufnr, 'buftype', 'nofile')
   vim.api.nvim_buf_set_option(result_bufnr, 'bufhidden', 'hide')
   vim.api.nvim_buf_set_option(result_bufnr, 'swapfile', false)
+  vim.api.nvim_buf_set_option(result_bufnr, 'readonly', true)
   -- set filetype to markdown
   vim.api.nvim_buf_set_option(result_bufnr, 'filetype', 'markdown')
 
@@ -100,6 +94,7 @@ local function display_in_result_buffer(content)
 
   -- Move cursor to the top of the buffer
   vim.api.nvim_win_set_cursor(winid, { 1, 0 })
+  vim.api.nvim_buf_set_option(bufnr, 'modified', false)
 end
 
 local function append_to_result_buffer(content)
@@ -127,8 +122,7 @@ local function append_to_result_buffer(content)
     vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, content_lines)
 
     vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
-
-    vim.api.nvim_win_set_option(winid, 'wrap', true)
+    vim.api.nvim_buf_set_option(bufnr, 'modified', false)
   end)
 end
 
@@ -141,7 +135,6 @@ end
 
 local M = {
   popup_input = popup_input,
-  print_to_split = print_to_split,
   get_result_buffer = get_result_buffer,
   display_in_result_buffer = display_in_result_buffer,
   append_to_result_buffer = append_to_result_buffer,
