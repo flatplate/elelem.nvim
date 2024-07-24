@@ -16,6 +16,8 @@ local context_suppliers = require("llm_search.context_suppliers")
 local query_suppliers = require("llm_search.query_suppliers")
 local output_handler = require("llm_search.output_handler")
 
+IS_DEBUG = false
+
 local function generic_llm_search(context_func, input_func, output_func, custom_prompt, model)
   local context = context_func()
   input_func(function(query)
@@ -30,59 +32,74 @@ local function generic_llm_search(context_func, input_func, output_func, custom_
   end)
 end
 
-M.search_quickfix = function(custom_prompt, model)
-  model = model or DEFAULT_MODEL
-  generic_llm_search(
-    context_suppliers.from_quickfix_list,
-    query_suppliers.from_popup,
-    output_handler.to_result_buffer,
-    custom_prompt,
-    model
-  )
+
+local search_quickfix_action = {
+  title = "Search quickfix list",
+  context_supplier = context_suppliers.from_quickfix_list,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.to_result_buffer,
+}
+
+local search_current_file_action = {
+  title = "Search current file",
+  context_supplier = context_suppliers.from_whole_file,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.to_result_buffer,
+}
+
+local search_visual_selection_action = {
+  title = "Search visual selection",
+  context_supplier = context_suppliers.from_visual_selection,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.to_result_buffer,
+}
+
+local append_llm_output_action = {
+  title = "Append LLM output to file",
+  context_supplier = context_suppliers.from_whole_file_with_append_marker,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.append_to_file,
+}
+
+local append_llm_output_visual_action = {
+  title = "Append LLM output to file",
+  context_supplier = context_suppliers.from_visual_selection,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.append_to_file,
+}
+
+local function build_action(action, default_model)
+  return function(custom_prompt, model)
+    generic_llm_search(
+      action.context_supplier,
+      action.query_supplier,
+      action.output_handler,
+      custom_prompt,
+      model or default_model
+    )
+  end
 end
 
-M.append_llm_output = function(custom_prompt, model)
-  model = model or DEFAULT_APPEND_MODEL
-  generic_llm_search(
-    context_suppliers.from_whole_file_with_append_marker,
-    query_suppliers.from_popup,
-    output_handler.append_to_file,
-    custom_prompt,
-    model
-  )
+M.actions = {
+  search_quickfix = search_quickfix_action,
+  search_current_file = search_current_file_action,
+  search_visual_selection = search_visual_selection_action,
+  append_llm_output = append_llm_output_action,
+  append_llm_output_visual = append_llm_output_visual_action,
+}
+
+M.search_quickfix = build_action(search_quickfix_action, DEFAULT_MODEL)
+M.append_llm_output = build_action(append_llm_output_action, DEFAULT_APPEND_MODEL)
+M.search_current_file = build_action(search_current_file_action, DEFAULT_MODEL)
+M.search_visual_selection = build_action(search_visual_selection_action, DEFAULT_MODEL)
+M.append_llm_output_visual = build_action(append_llm_output_visual_action, DEFAULT_APPEND_MODEL)
+
+M.set_debug = function(debug)
+  IS_DEBUG = debug
 end
 
-M.search_current_file = function(custom_prompt, model)
-  model = model or DEFAULT_MODEL
-  generic_llm_search(
-    context_suppliers.from_whole_file,
-    query_suppliers.from_popup,
-    output_handler.to_result_buffer,
-    custom_prompt,
-    model
-  )
-end
-
-M.search_visual_selection = function(custom_prompt, model)
-  model = model or DEFAULT_MODEL
-  generic_llm_search(
-    context_suppliers.from_visual_selection,
-    query_suppliers.from_popup,
-    output_handler.to_result_buffer,
-    custom_prompt,
-    model
-  )
-end
-
-M.append_llm_output_visual = function(custom_prompt, model)
-  model = model or DEFAULT_APPEND_MODEL
-  generic_llm_search(
-    context_suppliers.from_visual_selection,
-    query_suppliers.from_popup,
-    output_handler.append_to_file,
-    custom_prompt,
-    model
-  )
+M.toggle_debug = function()
+  IS_DEBUG = not IS_DEBUG
 end
 
 function M.open_log_file()

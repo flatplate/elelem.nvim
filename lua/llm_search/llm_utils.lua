@@ -13,11 +13,6 @@ local function query_llm(context, query, custom_prompt, callback, debug, model)
       (custom_prompt or "")
 
   local messages = get_messages(system_message, "CONTEXT\n######\n" .. context .. "\n#####\nQuery\n#####\n " .. query)
-
-  if debug then
-    local debug_content = "System Message:\n" .. system_message .. "\n\nContext and Query:\n" .. messages[2].content
-    io_utils.print_to_split(debug_content)
-  end
   model.provider.request(model, messages, callback)
 end
 

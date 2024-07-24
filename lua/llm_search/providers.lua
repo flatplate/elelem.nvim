@@ -32,6 +32,9 @@ local function run_curl_with_streaming(url, method, headers, body, on_chunk)
                 on_chunk(data)
             end
         end,
+        on_stderr = function(_, data)
+            vim.notify("Error: " .. data, vim.log.levels.ERROR)
+        end,
     })
 
     job:start()

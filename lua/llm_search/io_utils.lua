@@ -92,6 +92,9 @@ local function display_in_result_buffer(content)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(content, "\n"))
   vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
 
+  -- Set the filetype to Markdown
+  vim.api.nvim_buf_set_option(bufnr, 'filetype', 'markdown')
+
   -- Set 'wrap' option for the window
   vim.api.nvim_win_set_option(winid, 'wrap', true)
 

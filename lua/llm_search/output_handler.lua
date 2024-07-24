@@ -5,7 +5,11 @@ local io_utils = require("llm_search.io_utils")
 M.to_result_buffer = {
   init = function(model, context)
     io_utils.clear_result_buffer()
-    io_utils.display_in_result_buffer("Model: " .. model.name .. "\n\nContext:\n" .. context .. "\n\n>> ")
+    local output = "Model: " .. model.name .. "\n\n"
+    if IS_DEBUG then
+      output = output .. "Context:\n" .. context .. "\n\n"
+    end
+    io_utils.display_in_result_buffer(output)
   end,
 
   handle = function(str)

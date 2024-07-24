@@ -1,6 +1,8 @@
 local M = {}
 local providers = require("llm_search.providers")
 
+-- Fireworks models
+
 M.deepseek = {
     name = "accounts/fireworks/models/deepseek-coder-v2-lite-instruct",
     supports_system_message = true,
@@ -18,6 +20,27 @@ M.gemma = {
     provider = providers.fireworks,
     supports_system_message = true
 }
+
+M.llama_3_1_405B_fireworks = {
+    name = "accounts/fireworks/models/llama-v3p1-405b-instruct",
+    provider = providers.fireworks,
+    supports_system_message = true
+}
+
+M.llama_3_1_70B_fireworks = {
+    name = "accounts/fireworks/models/llama-v3p1-70b-instruct",
+    provider = providers.fireworks,
+    supports_system_message = true
+}
+
+M.llama_3_1_8B_fireworks = {
+    name = "accounts/fireworks/models/llama-v3p1-8b-instruct",
+    provider = providers.fireworks,
+    supports_system_message = true
+}
+
+
+-- Anthropic models
 
 M.claude_3_opus = {
     name = "claude-3-opus-20240229",
@@ -37,6 +60,9 @@ M.claude_2 = {
     supports_system_message = true
 }
 
+
+-- OpenAI models
+
 M.gpt4omini = {
     name = "gpt-4o-mini",
     provider = providers.openai,
@@ -48,6 +74,9 @@ M.gpt4o = {
     provider = providers.openai,
     supports_system_message = true
 }
+
+
+-- Groq models
 
 M.llama_3_1_405B = {
     name = "llama-3.1-405b-reasoning",
@@ -106,6 +135,41 @@ M.gemma_2_9B = {
     name = "gemma2-9b-it",
     provider = providers.groq,
     supports_system_message = true
+}
+
+
+-- Models by provider
+
+M.by_provider = {
+    fireworks = {
+        M.deepseek,
+        M.deepseek_base,
+        M.gemma,
+        llama_3_1_405B = M.llama_3_1_405B_fireworks,
+        llama_3_1_70B = M.llama_3_1_70B_fireworks,
+        llama_3_1_8B = M.llama_3_1_8B_fireworks
+    },
+    anthropic = {
+        M.claude_3_opus,
+        M.claude_3_5_sonnet,
+        M.claude_2
+    },
+    openai = {
+        M.gpt4omini,
+        M.gpt4o
+    },
+    groq = {
+        M.llama_3_1_405B,
+        M.llama_3_1_70B,
+        M.llama_3_1_8B,
+        M.llama_3_groq_70B,
+        M.llama_3_groq_8B,
+        M.meta_llama_3_70B,
+        M.meta_llama_3_8B,
+        M.mixtral_8x7B,
+        M.gemma_7B,
+        M.gemma_2_9B
+    }
 }
 
 return M
