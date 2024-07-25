@@ -49,4 +49,8 @@ function M.from_whole_file_with_append_marker()
   return file_utils.get_current_file_content_with_append_marker(bufnr, row, col)
 end
 
+function M.empty_context()
+  return ""
+end
+
 return M

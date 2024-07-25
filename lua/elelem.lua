@@ -68,6 +68,14 @@ local append_llm_output_visual_action = {
   output_handler = output_handler.append_to_file,
 }
 
+-- Just ask normally with empty context, shows in result buffer
+local ask_llm = {
+  title = "Ask LLM",
+  context_supplier = context_suppliers.empty_context,
+  query_supplier = query_suppliers.from_popup,
+  output_handler = output_handler.to_result_buffer,
+}
+
 local function build_action(action, default_model)
   return function(custom_prompt, model)
     generic_llm_search(
@@ -86,6 +94,7 @@ M.actions = {
   search_visual_selection = search_visual_selection_action,
   append_llm_output = append_llm_output_action,
   append_llm_output_visual = append_llm_output_visual_action,
+  ask_llm = ask_llm,
 }
 
 M.search_quickfix = build_action(search_quickfix_action, DEFAULT_MODEL)
@@ -93,6 +102,7 @@ M.append_llm_output = build_action(append_llm_output_action, DEFAULT_APPEND_MODE
 M.search_current_file = build_action(search_current_file_action, DEFAULT_MODEL)
 M.search_visual_selection = build_action(search_visual_selection_action, DEFAULT_MODEL)
 M.append_llm_output_visual = build_action(append_llm_output_visual_action, DEFAULT_APPEND_MODEL)
+M.ask_llm = build_action(ask_llm, DEFAULT_MODEL)
 
 M.set_debug = function(debug)
   IS_DEBUG = debug
