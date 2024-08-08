@@ -54,6 +54,12 @@ M.claude_3_5_sonnet = {
     supports_system_message = true
 }
 
+M.claude_3_haiku = {
+    name = "claude-3-haiku-20240307",
+    provider = providers.anthropic,
+    supports_system_message = true
+}
+
 M.claude_2 = {
     name = "claude-2.1",
     provider = providers.anthropic,
