@@ -122,7 +122,7 @@ M.anthropic = {
             body = vim.fn.json_encode({
                 model = model.name,
                 messages = messages,
-                max_tokens = 1024,
+                max_tokens = 8192,
                 system = system_message.content
             }),
             callback = vim.schedule_wrap(function(response)
@@ -155,7 +155,7 @@ M.anthropic = {
         local body = {
             model = model.name,
             messages = messages,
-            max_tokens = 1024,
+            max_tokens = 8192,
             stream = true,
             system = system_message.content
         }
