@@ -49,7 +49,7 @@ M.claude_3_opus = {
 }
 
 M.claude_3_5_sonnet = {
-    name = "claude-3-5-sonnet-20240620",
+    name = "claude-3-5-sonnet-20241022",
     provider = providers.anthropic,
     supports_system_message = true
 }
