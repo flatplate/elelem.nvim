@@ -182,7 +182,6 @@ M.anthropic = {
             system = system_message.content
         }
         local stream = function(data)
-            print(data)
             if data then
                 local lines = vim.split(data, "\n")
                 for _, line in ipairs(lines) do
@@ -198,7 +197,6 @@ M.anthropic = {
                 end
             end
         end
-        print("Running curl")
         run_curl_with_streaming({
             url = M.anthropic.api_url,
             method = "POST",

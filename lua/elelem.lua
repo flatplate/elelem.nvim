@@ -30,7 +30,6 @@ local function generic_llm_search(messages_supplier, output_func, model)
       -- Show loading message
       output_func.init(model, messages) -- Assume first message is context
 
-      print(vim.inspect(messages))
       model.provider.stream(model, messages, output_func.handle, output_func.finish)
     else
       print("No messages supplied")

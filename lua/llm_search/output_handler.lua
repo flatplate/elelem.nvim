@@ -23,7 +23,6 @@ M.append_to_chat_buffer = {
   end,
 
   handle = function(str)
-    print(str)
     io_utils.append_to_result_buffer(str)
   end,
 
