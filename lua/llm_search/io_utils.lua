@@ -57,7 +57,6 @@ local function get_result_buffer()
   vim.api.nvim_buf_set_option(result_bufnr, 'buftype', 'nofile')
   vim.api.nvim_buf_set_option(result_bufnr, 'bufhidden', 'hide')
   vim.api.nvim_buf_set_option(result_bufnr, 'swapfile', false)
-  vim.api.nvim_buf_set_option(result_bufnr, 'readonly', true)
   -- set filetype to markdown
   vim.api.nvim_buf_set_option(result_bufnr, 'filetype', 'markdown')
 
@@ -65,6 +64,17 @@ local function get_result_buffer()
   vim.api.nvim_buf_set_name(result_bufnr, "LLM Search Results")
 
   return result_bufnr
+end
+
+-- Function to read the content of the result buffer
+local function read_result_buffer()
+  local bufnr = get_result_buffer()
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  return table.concat(lines, "\n")
 end
 
 -- Function to display content in the result buffer
@@ -84,7 +94,6 @@ local function display_in_result_buffer(content)
   -- Clear the buffer and set its content
   vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.split(content, "\n"))
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
 
   -- Set the filetype to Markdown
   vim.api.nvim_buf_set_option(bufnr, 'filetype', 'markdown')
@@ -94,7 +103,6 @@ local function display_in_result_buffer(content)
 
   -- Move cursor to the top of the buffer
   vim.api.nvim_win_set_cursor(winid, { 1, 0 })
-  vim.api.nvim_buf_set_option(bufnr, 'modified', false)
 end
 
 local function append_to_result_buffer(content)
@@ -107,6 +115,7 @@ local function append_to_result_buffer(content)
       local current_win = vim.api.nvim_get_current_win()
       vim.cmd('vsplit')
       winid = vim.api.nvim_get_current_win()
+      vim.api.nvim_win_set_option(winid, 'wrap', true)
       vim.api.nvim_win_set_buf(winid, bufnr)
       vim.api.nvim_set_current_win(current_win) -- Return focus to the original window
     end
@@ -121,7 +130,6 @@ local function append_to_result_buffer(content)
     end
     vim.api.nvim_buf_set_lines(bufnr, last_line - 1, last_line, false, content_lines)
 
-    vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
     vim.api.nvim_buf_set_option(bufnr, 'modified', false)
   end)
 end
@@ -130,7 +138,6 @@ local function clear_result_buffer()
   local bufnr = get_result_buffer()
   vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
 end
 
 local M = {
@@ -139,6 +146,7 @@ local M = {
   display_in_result_buffer = display_in_result_buffer,
   append_to_result_buffer = append_to_result_buffer,
   clear_result_buffer = clear_result_buffer,
+  read_result_buffer = read_result_buffer,
 }
 
 return M

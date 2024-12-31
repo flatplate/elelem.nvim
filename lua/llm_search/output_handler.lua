@@ -1,4 +1,3 @@
--- output_handler.lua
 local M = {}
 local io_utils = require("llm_search.io_utils")
 
@@ -14,6 +13,22 @@ M.to_result_buffer = {
 
   handle = function(str)
     io_utils.append_to_result_buffer(str)
+  end
+}
+
+M.append_to_chat_buffer = {
+  init = function(model, context)
+    local output = "\n\n[Model]: "
+    io_utils.append_to_result_buffer(output)
+  end,
+
+  handle = function(str)
+    print(str)
+    io_utils.append_to_result_buffer(str)
+  end,
+
+  finish = function()
+    io_utils.append_to_result_buffer("\n\n[User]:")
   end
 }
 

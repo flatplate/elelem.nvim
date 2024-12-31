@@ -12,6 +12,10 @@ function M.from_popup(callback)
   end)
 end
 
+function M.empty_supplier(callback)
+  callback("")
+end
+
 -- Placeholder for potential future input methods
 -- function M.from_command_line(callback)
 --   -- Implementation

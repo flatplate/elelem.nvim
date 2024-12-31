@@ -1,39 +1,54 @@
 local curl = require("plenary.curl")
 local Job = require('plenary.job')
 
-local function run_curl_with_streaming(url, method, headers, body, on_chunk)
+local function run_curl_with_streaming(opts)
+    -- Default options
+    opts = vim.tbl_extend("keep", opts or {}, {
+        url = "",
+        method = "POST",
+        headers = {},
+        body = nil,
+        on_chunk = nil,
+        cleanup = nil
+    })
+
     local args = {
-        '-s',  -- silent mode
+        '-s', -- silent mode
         '-N', -- disable buffering
-        '-X', method,
+        '-X', opts.method,
         '-H', 'Content-Type: application/json'
     }
 
     -- Add custom headers
-    for _, header in ipairs(headers) do
+    for _, header in ipairs(opts.headers) do
         table.insert(args, '-H')
         table.insert(args, header)
     end
 
     -- Add body if present
-    if body then
+    if opts.body then
         table.insert(args, '-d')
-        table.insert(args, vim.json.encode(body))
+        table.insert(args, vim.json.encode(opts.body))
     end
 
     -- Add URL
-    table.insert(args, url)
+    table.insert(args, opts.url)
 
     local job = Job:new({
         command = 'curl',
         args = args,
         on_stdout = function(_, data)
-            if on_chunk then
-                on_chunk(data)
+            if opts.on_chunk then
+                opts.on_chunk(data)
             end
         end,
         on_stderr = function(_, data)
             vim.notify("Error: " .. data, vim.log.levels.ERROR)
+        end,
+        on_exit = function()
+            if opts.cleanup then
+                opts.cleanup()
+            end
         end,
     })
 
@@ -69,7 +84,7 @@ M.fireworks = {
         })
     end,
 
-    stream = function(model, messages, callback)
+    stream = function(model, messages, callback, cleanup)
         local api_key = M.config.providers.fireworks.api_key
         local headers = {
             "Content-Type: application/json",
@@ -96,7 +111,14 @@ M.fireworks = {
                 end
             end
         end
-        run_curl_with_streaming(M.fireworks.api_url, "POST", headers, body, stream)
+        run_curl_with_streaming({
+            url = M.fireworks.api_url,
+            method = "POST",
+            headers = headers,
+            body = body,
+            on_chunk = stream,
+            cleanup = cleanup
+        })
     end
 }
 
@@ -137,7 +159,7 @@ M.anthropic = {
         })
     end,
 
-    stream = function(model, messages, callback)
+    stream = function(model, messages, callback, cleanup)
         local api_key = M.config.providers.anthropic.api_key
         -- Get the system message
         local system_message = vim.tbl_filter(function(message)
@@ -160,6 +182,7 @@ M.anthropic = {
             system = system_message.content
         }
         local stream = function(data)
+            print(data)
             if data then
                 local lines = vim.split(data, "\n")
                 for _, line in ipairs(lines) do
@@ -175,7 +198,15 @@ M.anthropic = {
                 end
             end
         end
-        run_curl_with_streaming(M.anthropic.api_url, "POST", headers, body, stream)
+        print("Running curl")
+        run_curl_with_streaming({
+            url = M.anthropic.api_url,
+            method = "POST",
+            headers = headers,
+            body = body,
+            on_chunk = stream,
+            cleanup = cleanup
+        })
     end
 }
 
@@ -206,7 +237,7 @@ M.openai = {
         })
     end,
 
-    stream = function(model, messages, callback)
+    stream = function(model, messages, callback, cleanup)
         local api_key = M.config.providers.openai.api_key
         local headers = {
             "Content-Type: application/json",
@@ -234,7 +265,14 @@ M.openai = {
                 end
             end
         end
-        run_curl_with_streaming(M.openai.api_url, "POST", headers, body, stream)
+        run_curl_with_streaming({
+            url = M.openai.api_url,
+            method = "POST",
+            headers = headers,
+            body = body,
+            on_chunk = stream,
+            cleanup = cleanup,
+        })
     end
 }
 
@@ -282,7 +320,7 @@ M.groq = {
         })
     end,
 
-    stream = function(model, messages, callback)
+    stream = function(model, messages, callback, cleanup)
         local api_key = M.config.providers.groq.api_key
         local headers = {
             "Content-Type: application/json",
@@ -310,7 +348,14 @@ M.groq = {
                 end
             end
         end
-        run_curl_with_streaming(M.groq.api_url, "POST", headers, body, stream)
+        run_curl_with_streaming({
+            url = M.groq.api_url,
+            method = "POST",
+            headers = headers,
+            body = body,
+            on_chunk = stream,
+            cleanup = cleanup,
+        })
     end
 }
 
