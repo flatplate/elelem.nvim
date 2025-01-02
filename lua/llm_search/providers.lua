@@ -16,7 +16,6 @@ local function run_curl_with_streaming(opts)
         '-s', -- silent mode
         '-N', -- disable buffering
         '-X', opts.method,
-        '-H', 'Content-Type: application/json'
     }
 
     -- Add custom headers
@@ -44,6 +43,7 @@ local function run_curl_with_streaming(opts)
         end,
         on_stderr = function(_, data)
             vim.notify("Error: " .. data, vim.log.levels.ERROR)
+            print("Error: " .. data)
         end,
         on_exit = function()
             if opts.cleanup then
@@ -88,14 +88,19 @@ M.fireworks = {
         local api_key = M.config.providers.fireworks.api_key
         local headers = {
             "Content-Type: application/json",
-            "Authorization: Bearer " .. api_key
+            "Authorization: Bearer " .. api_key,
+            "Accept: application/json",
         }
         local body = {
             model = model.name,
             messages = messages,
             stream = true
         }
+        print("will start streaming for fireworks, model: " .. model.name)
+        print("body: " .. vim.inspect(body))
+        print("headers: " .. vim.inspect(headers))
         local stream = function(data)
+            print("streaming data: " .. data)
             if data then
                 local lines = vim.split(data, "\n")
                 for _, line in ipairs(lines) do

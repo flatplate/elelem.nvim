@@ -4,6 +4,7 @@ local providers = require("llm_search.providers")
 local context_picker = require("llm_search.context_picker")
 local context = require("llm_search.context")
 local io_utils = require("llm_search.io_utils")
+local highlights = require("llm_search.highlights")
 
 M.context_picker = context_picker.context_picker
 M.context = context
@@ -11,7 +12,7 @@ M.context = context
 -- Configuration
 local DEFAULT_MODEL = models.deepseek
 local DEFAULT_APPEND_MODEL = models.deepseek_base
-local CONTEXT_LINES = 8 -- Number of lines to extract before and after each quickfix item
+local CONTEXT_LINES = 16 -- Number of lines to extract before and after each quickfix item
 
 local config            -- Config from the setup function
 local plenary_path = require('plenary.path')
@@ -21,8 +22,7 @@ local context_suppliers = require("llm_search.context_suppliers")
 local query_suppliers = require("llm_search.query_suppliers")
 local output_handler = require("llm_search.output_handler")
 
-IS_DEBUG = false
-
+IS_DEBUG = true
 
 local function generic_llm_search(messages_supplier, output_func, model)
   messages_supplier(function(messages)
@@ -36,6 +36,7 @@ local function generic_llm_search(messages_supplier, output_func, model)
     end
   end)
 end
+
 
 local function combine_context_and_input(opts)
   local context_func = opts.context_supplier
@@ -110,6 +111,13 @@ local ask_chat = {
   output_handler = output_handler.append_to_chat_buffer,
 }
 
+local ask_next_change = {
+  title = "Ask LLM for next change",
+  context_supplier = context_suppliers.from_undo,
+  query_supplier = query_suppliers.empty_supplier,
+  output_handler = output_handler.to_result_buffer,
+}
+
 local function init_new_chat()
   -- Clear the chat buffer
   -- ctx is a table from file name - line to the stirng
@@ -145,7 +153,10 @@ M.actions = {
   append_llm_output = append_llm_output_action,
   append_llm_output_visual = append_llm_output_visual_action,
   ask_llm = ask_llm,
+  ask_chat = ask_chat,
+  ask_next_change = ask_next_change,
 }
+
 
 M.search_quickfix = build_action(search_quickfix_action, DEFAULT_MODEL)
 M.append_llm_output = build_action(append_llm_output_action, DEFAULT_APPEND_MODEL)
@@ -154,7 +165,9 @@ M.search_visual_selection = build_action(search_visual_selection_action, DEFAULT
 M.append_llm_output_visual = build_action(append_llm_output_visual_action, DEFAULT_APPEND_MODEL)
 M.ask_llm = build_action(ask_llm, DEFAULT_MODEL)
 M.ask_chat = build_action(ask_chat, DEFAULT_MODEL)
+M.ask_next_change = build_action(ask_next_change, DEFAULT_MODEL)
 M.init_new_chat = init_new_chat
+M.apply_changes = highlights.apply_diff_changes
 
 M.generic_action = function(opts)
   local action = {
@@ -193,9 +206,9 @@ end
 
 M.setup = function(opts)
   config = opts
+  highlights.setup()
   providers.set_config(opts)
 end
 
 M.models = models
-
 return M

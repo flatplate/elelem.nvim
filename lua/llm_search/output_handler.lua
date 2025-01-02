@@ -6,7 +6,7 @@ M.to_result_buffer = {
     io_utils.clear_result_buffer()
     local output = "Model: " .. model.name .. "\n\n"
     if IS_DEBUG then
-      output = output .. "Context:\n" .. context .. "\n\n"
+      output = output .. "Context:\n" .. vim.inspect(context) .. "\n\n"
     end
     io_utils.display_in_result_buffer(output)
   end,

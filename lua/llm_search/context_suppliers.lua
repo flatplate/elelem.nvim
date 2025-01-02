@@ -2,6 +2,7 @@
 local M = {}
 local file_utils = require("llm_search.file_utils")
 local io_utils = require("llm_search.io_utils")
+local diff = require("llm_search.diff")
 
 local CONTEXT_LINES = 8
 
@@ -11,6 +12,10 @@ local function create_message(role, content)
         role = role,
         content = content
     }
+end
+
+function M.from_undo()
+    return { create_message("user", "Changes:\n" .. diff.get_last_change_diff()) }
 end
 
 function M.from_visual_selection()

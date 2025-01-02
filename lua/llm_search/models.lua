@@ -39,6 +39,17 @@ M.llama_3_1_8B_fireworks = {
     supports_system_message = true
 }
 
+M.qwen = {
+    name = "accounts/fireworks/models/qwen2p5-72b-instruct",
+    provider = providers.fireworks,
+    supports_system_message = true
+}
+
+M.deepseek_3 = {
+    name = "accounts/fireworks/models/deepseek-v3",
+    provider = providers.fireworks,
+    supports_system_message = true
+}
 
 -- Anthropic models
 
@@ -56,6 +67,12 @@ M.claude_3_5_sonnet = {
 
 M.claude_3_haiku = {
     name = "claude-3-haiku-20240307",
+    provider = providers.anthropic,
+    supports_system_message = true
+}
+
+M.claude_3_5_haiku = {
+    name = "claude-3-5-haiku-20241022",
     provider = providers.anthropic,
     supports_system_message = true
 }
