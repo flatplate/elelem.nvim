@@ -22,7 +22,7 @@ local context_suppliers = require("llm_search.context_suppliers")
 local query_suppliers = require("llm_search.query_suppliers")
 local output_handler = require("llm_search.output_handler")
 
-IS_DEBUG = true
+IS_DEBUG = false
 
 local function generic_llm_search(messages_supplier, output_func, model)
   messages_supplier(function(messages)
