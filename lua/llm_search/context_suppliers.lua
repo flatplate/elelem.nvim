@@ -56,7 +56,6 @@ end
 
 function M.from_git_diff()
     -- Execute git diff with maximum context lines
-    print("Executing git diff")
     local handle = io.popen("git diff --unified=9999 2>&1")
     if not handle then
         vim.notify("Failed to execute git diff", vim.log.levels.ERROR)
@@ -80,12 +79,12 @@ end
 -- A user message starts with \n\n[User]:
 -- An ignored/comment message starts with \n\n[Comment]:
 function M.from_chat()
-    local chat_lines = io_utils.read_result_buffer()
+    local chat_buffer_content = io_utils.read_result_buffer()
 
     -- Check if chat_lines is nil or empty
-    if not chat_lines or chat_lines == "" then
+    if not chat_buffer_content or chat_buffer_content == "" then
         vim.notify("No chat found", vim.log.levels.WARN)
-        return create_message("user", "")
+        return {}
     end
 
     local messages = {}
@@ -95,13 +94,12 @@ function M.from_chat()
     }
 
     local function insert_into_messages()
+        local content = table.concat(current_message.content, "\n")
         if current_message.role == "user" then
             -- Handle commands
-            local content = table.concat(current_message.content, "\n")
             if content:match("/git%-diff") then
                 -- Remove the command from the content
-                content = content:gsub("/git%-diff%s*", "")
-                current_message.content = { content }
+                content = (content:gsub("/git%-diff%s*", ""))
 
                 -- Get git diff messages and prepend them
                 local git_diff_messages = M.from_git_diff()
@@ -111,28 +109,27 @@ function M.from_chat()
             end
         end
         if current_message.role then
-            table.insert(
-            messages,
-            create_message(current_message.role, table.concat(current_message.content, "\n"))
-            )
+            table.insert(messages, create_message(current_message.role, content))
         end
     end
 
     -- Split the string into lines
-    for line in chat_lines:gmatch("[^\r\n]+") do
+    local lines = vim.split(chat_buffer_content, "\n", { plain = true })
+    for _, line in ipairs(lines) do
         if line:match("^%[Model%]:") then
             insert_into_messages()
             -- Start new model message
             current_message = {
                 role = "assistant",
-                content = { line:gsub("^%[Model%]:%s*", "") },
+                content = { (line:gsub("^%[Model%]:%s*", "")) },
             }
         elseif line:match("^%[User%]:") then
             insert_into_messages()
             -- Start new user message
+
             current_message = {
                 role = "user",
-                content = { line:gsub("^%[User%]:%s*", "") },
+                content = { (line:gsub("^%[User%]:%s*", "")) },
             }
         elseif line:match("^%[Comment%]:") then
             insert_into_messages()
@@ -222,8 +219,7 @@ function M.from_lsp_diagnostics()
 
         table.insert(
         lines,
-        string.format("[%s] Line %d, Col %d: %s\nCode: %s", severity, line, col, diag.message,
-        line_content)
+        string.format("[%s] Line %d, Col %d: %s\nCode: %s", severity, line, col, diag.message, line_content)
         )
     end
 
