@@ -10,7 +10,7 @@ local CONTEXT_LINES = 8
 local function create_message(role, content)
     return {
         role = role,
-        content = content
+        content = content,
     }
 end
 
@@ -26,7 +26,7 @@ function M.from_visual_selection()
     local lines = vim.api.nvim_buf_get_lines(bufnr, start_pos[2] - 1, end_pos[2], false)
 
     local content
-    if mode == 'V' then
+    if mode == "V" then
         content = table.concat(lines, "\n")
     else
         if #lines == 1 then
@@ -38,7 +38,7 @@ function M.from_visual_selection()
         content = table.concat(lines, "\n")
     end
 
-    return { create_message("user", "Selected text:\n" .. content) }
+    return create_message("user", "Selected text:\n" .. content)
 end
 
 function M.combine_providers(providers)
@@ -52,6 +52,26 @@ function M.combine_providers(providers)
         end
         return combined_messages
     end
+end
+
+function M.from_git_diff()
+    -- Execute git diff with maximum context lines
+    print("Executing git diff")
+    local handle = io.popen("git diff --unified=9999 2>&1")
+    if not handle then
+        vim.notify("Failed to execute git diff", vim.log.levels.ERROR)
+        return { create_message("user", "") }
+    end
+    local diff_output = handle:read("*a")
+    handle:close()
+
+    -- Handle empty output case
+    if diff_output == "" then
+        vim.notify("No git changes detected", vim.log.levels.WARN)
+        return { create_message("user", "") }
+    end
+
+    return { create_message("user", "Git diff with full context:\n" .. diff_output) }
 end
 
 -- Reads the chat buffer
@@ -71,49 +91,55 @@ function M.from_chat()
     local messages = {}
     local current_message = {
         role = nil,
-        content = {}
+        content = {},
     }
+
+    local function insert_into_messages()
+        if current_message.role == "user" then
+            -- Handle commands
+            local content = table.concat(current_message.content, "\n")
+            if content:match("/git%-diff") then
+                -- Remove the command from the content
+                content = content:gsub("/git%-diff%s*", "")
+                current_message.content = { content }
+
+                -- Get git diff messages and prepend them
+                local git_diff_messages = M.from_git_diff()
+                for i = #git_diff_messages, 1, -1 do
+                    table.insert(messages, 1, git_diff_messages[i])
+                end
+            end
+        end
+        if current_message.role then
+            table.insert(
+            messages,
+            create_message(current_message.role, table.concat(current_message.content, "\n"))
+            )
+        end
+    end
 
     -- Split the string into lines
     for line in chat_lines:gmatch("[^\r\n]+") do
         if line:match("^%[Model%]:") then
-            -- If there was a previous message, add it to messages
-            if current_message.role then
-                table.insert(messages, create_message(
-                    current_message.role,
-                    table.concat(current_message.content, "\n")
-                ))
-            end
+            insert_into_messages()
             -- Start new model message
             current_message = {
                 role = "assistant",
-                content = { line:gsub("^%[Model%]:%s*", "") }
+                content = { line:gsub("^%[Model%]:%s*", "") },
             }
         elseif line:match("^%[User%]:") then
-            -- If there was a previous message, add it to messages
-            if current_message.role then
-                table.insert(messages, create_message(
-                    current_message.role,
-                    table.concat(current_message.content, "\n")
-                ))
-            end
+            insert_into_messages()
             -- Start new user message
             current_message = {
                 role = "user",
-                content = { line:gsub("^%[User%]:%s*", "") }
+                content = { line:gsub("^%[User%]:%s*", "") },
             }
         elseif line:match("^%[Comment%]:") then
-            -- If there was a previous message, add it to messages
-            if current_message.role then
-                table.insert(messages, create_message(
-                    current_message.role,
-                    table.concat(current_message.content, "\n")
-                ))
-            end
+            insert_into_messages()
             -- Reset current message when encountering a comment
             current_message = {
                 role = nil,
-                content = {}
+                content = {},
             }
         elseif current_message.role then
             -- Append line to current message if it exists
@@ -121,13 +147,7 @@ function M.from_chat()
         end
     end
 
-    -- Add the last message if it exists
-    if current_message.role then
-        table.insert(messages, create_message(
-            current_message.role,
-            table.concat(current_message.content, "\n")
-        ))
-    end
+    insert_into_messages()
 
     return messages
 end
@@ -170,6 +190,73 @@ function M.from_whole_file_with_append_marker()
 
     local content = file_utils.get_current_file_content_with_append_marker(bufnr, row, col)
     return { create_message("user", "File content with append marker:\n" .. content) }
+end
+
+-- Gets the LSP diagnostics for the current buffer
+function M.from_lsp_diagnostics()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local diagnostics = vim.diagnostic.get(bufnr)
+
+    if #diagnostics == 0 then
+        vim.notify("No LSP diagnostics found", vim.log.levels.WARN)
+        return { create_message("user", "") }
+    end
+
+    -- Sort diagnostics by line number
+    table.sort(diagnostics, function(a, b)
+        return a.lnum < b.lnum
+    end)
+
+    -- Format diagnostics into a readable string
+    local lines = {}
+    local filename = vim.fn.expand("%:p")
+    table.insert(lines, string.format("LSP diagnostics for %s:", filename))
+
+    for _, diag in ipairs(diagnostics) do
+        local severity = vim.diagnostic.severity[diag.severity] or "UNKNOWN"
+        local line = diag.lnum + 1 -- Convert to 1-based line numbers
+        local col = diag.col + 1 -- Convert to 1-based column numbers
+
+        -- Get the line content for context
+        local line_content = vim.api.nvim_buf_get_lines(bufnr, diag.lnum, diag.lnum + 1, false)[1] or ""
+
+        table.insert(
+        lines,
+        string.format("[%s] Line %d, Col %d: %s\nCode: %s", severity, line, col, diag.message,
+        line_content)
+        )
+    end
+
+    -- Get some surrounding context for each diagnostic
+    local context_lines = {}
+    local prev_range_end = -1
+
+    for _, diag in ipairs(diagnostics) do
+        local start_line = math.max(0, diag.lnum - CONTEXT_LINES)
+        local end_line = math.min(vim.api.nvim_buf_line_count(bufnr) - 1, diag.lnum + CONTEXT_LINES)
+
+        -- Avoid duplicating context if diagnostics are close together
+        if start_line > prev_range_end then
+            if prev_range_end ~= -1 then
+                table.insert(context_lines, "...")
+            end
+
+            local context = vim.api.nvim_buf_get_lines(bufnr, start_line, end_line + 1, false)
+            for i, line in ipairs(context) do
+                local line_num = start_line + i
+                table.insert(context_lines, string.format("%d: %s", line_num + 1, line))
+            end
+
+            prev_range_end = end_line
+        end
+    end
+
+    if #context_lines > 0 then
+        table.insert(lines, "\nContext:")
+        vim.list_extend(lines, context_lines)
+    end
+
+    return { create_message("user", table.concat(lines, "\n")) }
 end
 
 function M.empty_context()

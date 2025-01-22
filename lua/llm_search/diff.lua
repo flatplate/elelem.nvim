@@ -4,6 +4,7 @@ function M.get_last_change_diff()
   -- Store current state
   local current_buf = vim.api.nvim_get_current_buf()
   local current_lines = vim.api.nvim_buf_get_lines(current_buf, 0, -1, false)
+  local file_path = vim.api.nvim_buf_get_name(current_buf)
 
   -- Store current position in undo tree
   local saved_changes = vim.fn.changenr()
@@ -18,14 +19,13 @@ function M.get_last_change_diff()
   -- Return to current state
   vim.cmd('silent! undo ' .. saved_changes)
 
-
-  -- Generate diff content
-  local diff_content = {}
-  local max_length = #tostring(math.max(#current_lines, #old_lines))
-  local line_format = "%" .. max_length .. "d %s%s"
-
-  -- Track if any changes were found
-  local has_changes = false
+  -- Generate git-style diff header
+  local diff_content = {
+    "diff --git a/" .. file_path .. " b/" .. file_path,
+    "--- a/" .. file_path,
+    "+++ b/" .. file_path,
+    "@@ -1," .. #old_lines .. " +1," .. #current_lines .. " @@"
+  }
 
   -- Compare and generate diff
   for i = 1, math.max(#current_lines, #old_lines) do
@@ -34,26 +34,25 @@ function M.get_last_change_diff()
 
     if old_line == new_line then
       -- Identical lines
-      table.insert(diff_content, string.format(line_format, i, " ", new_line))
+      table.insert(diff_content, " " .. new_line)
     else
       -- Changed lines
-      has_changes = true
       if old_line ~= '' and new_line ~= '' and old_line ~= new_line then
         -- Line was modified
-        table.insert(diff_content, string.format(line_format, i, "-", old_line))
-        table.insert(diff_content, string.format(line_format, i, "+", new_line))
+        table.insert(diff_content, "-" .. old_line)
+        table.insert(diff_content, "+" .. new_line)
       elseif old_line ~= '' then
         -- Line was removed
-        table.insert(diff_content, string.format(line_format, i, "-", old_line))
+        table.insert(diff_content, "-" .. old_line)
       elseif new_line ~= '' then
         -- Line was added
-        table.insert(diff_content, string.format(line_format, i, "+", new_line))
+        table.insert(diff_content, "+" .. new_line)
       end
     end
   end
 
-  if not has_changes then
-    table.insert(diff_content, "No changes in last undo step")
+  if #diff_content == 4 then  -- Only header lines, no changes
+    return "No changes in last undo step"
   end
 
   return table.concat(diff_content, '\n')

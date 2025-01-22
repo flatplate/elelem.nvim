@@ -14,7 +14,6 @@ local DEFAULT_MODEL = models.deepseek
 local DEFAULT_APPEND_MODEL = models.deepseek_base
 local CONTEXT_LINES = 16 -- Number of lines to extract before and after each quickfix item
 
-local config            -- Config from the setup function
 local plenary_path = require('plenary.path')
 local log_path = plenary_path:new(vim.fn.stdpath('cache')):joinpath('quickfix_llm_search.log')
 
@@ -111,6 +110,13 @@ local ask_chat = {
   output_handler = output_handler.append_to_chat_buffer,
 }
 
+local fix_diagnostic = {
+  title = "Fix diagnostic",
+  context_supplier = context_suppliers.from_lsp_diagnostics,
+  query_supplier = query_suppliers.empty_supplier,
+  output_handler = output_handler.to_result_buffer,
+}
+
 local ask_next_change = {
   title = "Ask LLM for next change",
   context_supplier = context_suppliers.from_undo,
@@ -155,6 +161,7 @@ M.actions = {
   ask_llm = ask_llm,
   ask_chat = ask_chat,
   ask_next_change = ask_next_change,
+  fix_diagnostic = fix_diagnostic,
 }
 
 

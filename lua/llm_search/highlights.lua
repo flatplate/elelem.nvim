@@ -6,17 +6,17 @@ local M = {}
 local ns_id = vim.api.nvim_create_namespace("inline_suggestions")
 local current_extmarks = {}
 
--- Setup highlight groups
+local function startswith(str, prefix)
+  return string.sub(str, 1, #prefix) == prefix
+end
+
+-- Setup highlight grou
 local function setup_highlights()
-  vim.api.nvim_set_hl(0, "InlineSuggestionRemove", { fg = "#F47067", strikethrough = true })
+  vim.api.nvim_set_hl(1, "InlineSuggestionRemove", { fg = "#F47067", strikethrough = true })
   vim.api.nvim_set_hl(0, "InlineSuggestionAdd", { fg = "#4EC994", italic = true })
   vim.api.nvim_set_hl(0, "InlineSuggestionUnchanged", { fg = "#808080" })
 end
 
-local function apply_line_change(line_num, old_line, new_line)
-  -- Replace the line in the buffer
-  vim.api.nvim_buf_set_lines(0, line_num - 1, line_num, false, { new_line })
-end
 
 -- Clear all suggestions
 local function clear_suggestions()
@@ -45,85 +45,115 @@ local function common_suffix(str1, str2, start1, start2)
   return str1:sub(#str1 - i + 1)
 end
 
-function M.apply_changes()
-  local result_buf = io_utils.get_result_buffer()
-  if not result_buf then
-    vim.notify("No result buffer found", vim.log.levels.ERROR)
-    return
-  end
-
-  local lines = vim.api.nvim_buf_get_lines(result_buf, 0, -1, false)
+function M.parse_diff_hunks(lines)
+  local edits = {}
   local in_code_block = false
   local current_hunk = {}
-  local hunks = {}
+  local current_path = nil
+  local have_file_header = false
 
-  -- Parse hunks from buffer
   for _, line in ipairs(lines) do
-    if line == "```" then
-      if in_code_block then
-        if #current_hunk > 0 and current_hunk[1]:match("^@@") then
-          table.insert(hunks, table.concat(current_hunk, "\n"))
-        end
+    if startswith(line, "```diff") then
+      in_code_block = true
+      have_file_header = false
+      goto continue
+    elseif line == "```" then
+      -- Exit code block and save current hunk if not empty
+      if #current_hunk > 0 then
+        table.insert(edits, { path = current_path, hunk = current_hunk })
         current_hunk = {}
       end
-      in_code_block = not in_code_block
-    elseif in_code_block then
-      table.insert(current_hunk, line)
-    end
-  end
-
-  -- Process each hunk
-  for _, hunk in ipairs(hunks) do
-    local line_num = tonumber(string.match(hunk, '@@ (%d+)'))
-    if not line_num then goto continue end
-
-    local removal_lines = {}
-    local addition_lines = {}
-
-    -- Extract content parts of removal/addition lines
-    for line in vim.gsplit(hunk, "\n") do
-      if line:match("^%- ") then
-        table.insert(removal_lines, {
-          content = vim.trim(line:sub(3)),
-          full = line:sub(3)
-        })
-      elseif line:match("^%+ ") then
-        table.insert(addition_lines, {
-          content = vim.trim(line:sub(3)),
-          full = line:sub(3)
-        })
-      end
+      in_code_block = false
+      goto continue
     end
 
-    if #removal_lines > 0 then
-      local current_lines = vim.api.nvim_buf_get_lines(0, line_num - 1, line_num - 1 + #removal_lines, false)
-      local matches = true
-
-      -- Check if the current lines match the removal lines
-      for i = 1, #removal_lines do
-        local current_content = vim.trim(current_lines[i] or "")
-        if current_content ~= removal_lines[i].content then
-          matches = false
-          break
+    if in_code_block then
+      -- Handle file headers (--- and +++ lines)
+      if not have_file_header then
+        if line:match("^%-%-%- ") then
+          -- Skip the --- line
+          goto continue
+        elseif line:match("^%+%+%+ ") then
+          current_path = line:sub(5):gsub("^%s*(.-)%s*$", "%1")
+          have_file_header = true
+          goto continue
         end
       end
 
-      if matches then
-        -- Apply changes for each line
-        for i = 1, math.max(#removal_lines, #addition_lines) do
-          local old_line = removal_lines[i] and removal_lines[i].full or ""
-          local new_line = addition_lines[i] and addition_lines[i].full or ""
-          if old_line ~= new_line then
-            apply_line_change(line_num + i - 1, old_line, new_line)
-          end
-        end
+      -- Add all other lines to the current hunk
+      if #line > 0 then
+        table.insert(current_hunk, line)
       end
     end
     ::continue::
   end
 
-  -- Clear suggestions after applying changes
-  clear_suggestions()
+  -- Add final hunk if there is one
+  if #current_hunk > 0 then
+    table.insert(edits, { path = current_path, hunk = current_hunk })
+  end
+
+  return edits
+end
+
+-- Move hunk processing logic to a separate function
+function M.process_hunk(hunk)
+  local removal_lines = {}
+  local addition_lines = {}
+  local preceding_context = {}
+  local following_context = {}
+  local current_context = {}
+  local changes_started = false
+
+  local function start_changes()
+    if not changes_started then
+      preceding_context = vim.list_slice(current_context, 1, #current_context)
+      current_context = {}
+      changes_started = true
+      return true
+    elseif #current_context > 0 then
+      -- Add the context lines to both removal and addition
+      -- To make sure we have one continuous context block
+      for _, context_line in ipairs(current_context) do
+        table.insert(removal_lines, context_line)
+        table.insert(addition_lines, context_line)
+      end
+      current_context = {}
+      return true
+    end
+    return false
+  end
+
+  for _, line in ipairs(hunk) do
+    if line:match("^@@") then
+      goto continue
+    end
+
+    if line:match("^%-") then
+      start_changes()
+      table.insert(removal_lines, {
+        content = vim.trim(line:sub(2)),
+        full = line:sub(2)
+      })
+    elseif line:match("^%+") then
+      start_changes()
+      table.insert(addition_lines, {
+        content = vim.trim(line:sub(2)),
+        full = line:sub(2)
+      })
+    else
+      table.insert(current_context, {
+        content = vim.trim(line:sub(2)),
+        full = line:sub(2)
+      })
+    end
+    ::continue::
+  end
+  if #current_context > 0 then
+    following_context = current_context
+  end
+
+  return removal_lines, addition_lines, preceding_context, following_context
 end
 
 -- Show inline diff for a single line
@@ -181,92 +211,122 @@ local function show_inline_diff(line_num, old_line, new_line)
   table.insert(current_extmarks, extmark_id)
 end
 
+-- Move context matching logic to a separate function
+function M.find_context_match(buf, preceding_context, removal_lines, following_context)
+  local buf_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local matches = 0
+  local start_line = nil
+  -- function vim.list_extend(dst: <T:table>, src: table, start?: integer, finish?: integer)
+  local context_lines = {}
+  context_lines = vim.list_extend(context_lines, preceding_context)
+  context_lines = vim.list_extend(context_lines, removal_lines)
+  context_lines = vim.list_extend(context_lines, following_context)
+
+  -- TODO this should probably just look at the removal lines at first, then use the context if there are multiple matches
+  if #context_lines == 0 then
+    return nil
+  end
+
+  for i, line in ipairs(buf_lines) do
+    if vim.trim(line) == context_lines[1].content then
+      start_line = i
+      for j = 2, #context_lines do
+        if not vim.trim(buf_lines[i + j - 1]) == context_lines[j].content then
+          goto continue
+        end
+      end
+      matches = matches + 1
+    end
+    ::continue::
+  end
+
+  if matches == 1 then
+    return start_line + #preceding_context
+  end
+  return nil
+end
+
+-- Keep original function signatures but use the new components
+function M.apply_changes()
+  local result_buf = io_utils.get_result_buffer()
+  print("Result buffer: ", result_buf)
+  if not result_buf then
+    vim.notify("No result buffer found", vim.log.levels.ERROR)
+    return
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(result_buf, 0, -1, false)
+  local edits = M.parse_diff_hunks(lines)
+
+  for _, edit in ipairs(edits) do
+    local buf = vim.fn.bufnr(edit.path)
+    if buf == -1 then
+      -- try getting the current buffer
+      buf = vim.api.nvim_get_current_buf()
+      if buf == -1 then
+        goto continue
+      end
+    end
+
+    local removal_lines, addition_lines, preceding_context, following_context = M.process_hunk(edit.hunk)
+    print("Removal lines: ", vim.inspect(removal_lines))
+
+    if #preceding_context > 0 or #removal_lines > 0 or #following_context > 0 then
+      local start_line = M.find_context_match(buf, preceding_context, removal_lines, following_context)
+      print("Preceding context: ", vim.inspect(preceding_context))
+      print("Following context: ", vim.inspect(following_context))
+      print("Removal lines: ", vim.inspect(removal_lines))
+      print("Start line: ", start_line)
+
+      if start_line then
+        -- insert #addition_lines lines starting from start_line
+        local addition_lines_full = {}
+        for i = 1, #addition_lines do
+          table.insert(addition_lines_full, addition_lines[i].full)
+        end
+        vim.api.nvim_buf_set_lines(buf, start_line - 1, start_line + #removal_lines, false, addition_lines_full)
+      end
+    end
+    ::continue::
+  end
+
+  clear_suggestions()
+end
+
 function M.apply_diff_changes()
-  -- If we are already showing suggestions, apply changes and return
   if #current_extmarks > 0 then
     M.apply_changes()
     return
   end
+
   local result_buf = io_utils.get_result_buffer()
   if not result_buf then
     vim.notify("No result buffer found", vim.log.levels.ERROR)
     return
   end
 
-  -- Clear any existing suggestions
   clear_suggestions()
-
   local lines = vim.api.nvim_buf_get_lines(result_buf, 0, -1, false)
-  local in_code_block = false
-  local current_hunk = {}
-  local hunks = {}
+  local edits = M.parse_diff_hunks(lines)
 
-  -- Parse hunks from buffer
-  for _, line in ipairs(lines) do
-    if line == "```" then
-      if in_code_block then
-        if #current_hunk > 0 and current_hunk[1]:match("^@@") then
-          table.insert(hunks, table.concat(current_hunk, "\n"))
-        end
-        current_hunk = {}
-      end
-      in_code_block = not in_code_block
-    elseif in_code_block then
-      table.insert(current_hunk, line)
-    end
-  end
+  for _, edit in ipairs(edits) do
+    local buf = vim.fn.bufnr(edit.path)
+    if buf == -1 then goto continue end
 
-  -- Process each hunk
-  for _, hunk in ipairs(hunks) do
-    local line_num = tonumber(string.match(hunk, '@@ (%d+)'))
-    if not line_num then goto continue end
+    local removal_lines, addition_lines, preceding_context, following_context = M.process_hunk(edit.hunk)
 
-    local removal_lines = {}
-    local addition_lines = {}
+    if #removal_lines > 0 or #preceding_context > 0 or #following_context > 0 then
+      local start_line = M.find_context_match(buf, preceding_context, removal_lines, following_context)
 
-    -- Extract content parts of removal/addition lines
-    for line in vim.gsplit(hunk, "\n") do
-      if line:match("^%- ") then
-        table.insert(removal_lines, {
-          content = vim.trim(line:sub(3)),
-          full = line:sub(3)
-        })
-      elseif line:match("^%+ ") then
-        table.insert(addition_lines, {
-          content = vim.trim(line:sub(3)),
-          full = line:sub(3)
-        })
-      end
-    end
-
-    if #removal_lines > 0 then
-      local current_lines = vim.api.nvim_buf_get_lines(0, line_num - 1, line_num - 1 + #removal_lines, false)
-      local matches = true
-
-      -- Check if the current lines match the removal lines
-      for i = 1, #removal_lines do
-        local current_content = vim.trim(current_lines[i] or "")
-        if current_content ~= removal_lines[i].content then
-          matches = false
-          break
-        end
-      end
-
-      if matches then
-        -- For each pair of lines, show inline diff
-        for i = 1, math.max(#removal_lines, #addition_lines) do
-          local old_line = removal_lines[i] and removal_lines[i].full or ""
-          local new_line = addition_lines[i] and addition_lines[i].full or ""
-          if old_line ~= new_line then
-            show_inline_diff(line_num + i - 1, old_line, new_line)
-          end
+      if start_line then
+        for i = 1, #removal_lines do
+          show_inline_diff(start_line + i - 1, removal_lines[i].full, addition_lines[i].full)
         end
       end
     end
     ::continue::
   end
 
-  -- Setup autocommands to clear suggestions
   vim.api.nvim_create_autocmd({ "InsertEnter", "BufLeave" }, {
     callback = clear_suggestions,
     once = true
