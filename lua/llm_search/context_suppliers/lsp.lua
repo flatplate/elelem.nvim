@@ -33,7 +33,7 @@ function M.get_definition_at_snippet(file_path, marked_snippet, callback)
 		local file_exists = vim.fn.filereadable(file_path) == 1
 		if not file_exists then
 			vim.schedule(function()
-				callback(nil, "File not found")
+				callback("File not found", nil)
 			end)
 			return
 		end
@@ -49,7 +49,7 @@ function M.get_definition_at_snippet(file_path, marked_snippet, callback)
 		local pos = M.find_position_from_snippet(buffer_content, marked_snippet)
 		if not pos then
 			vim.schedule(function()
-				callback(nil, "Snippet not found")
+				callback("Snippet not found", nil)
 			end)
 			return
 		end
@@ -76,7 +76,7 @@ function M.get_references_at_snippet(file_path, marked_snippet, callback)
 		local file_exists = vim.fn.filereadable(file_path) == 1
 		if not file_exists then
 			vim.schedule(function()
-				callback(nil, "File not found")
+				callback("File not found", nil)
 			end)
 			return
 		end
@@ -92,7 +92,7 @@ function M.get_references_at_snippet(file_path, marked_snippet, callback)
 		local pos = M.find_position_from_snippet(buffer_content, marked_snippet)
 		if not pos then
 			vim.schedule(function()
-				callback(nil, "Snippet not found")
+				callback("Snippet not found", nil)
 			end)
 			return
 		end

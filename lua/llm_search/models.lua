@@ -82,6 +82,7 @@ M.claude_3_5_haiku = {
 	name = "claude-3-5-haiku-20241022",
 	provider = providers.anthropic,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.claude_2 = {
