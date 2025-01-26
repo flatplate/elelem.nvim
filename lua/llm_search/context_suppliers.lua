@@ -46,7 +46,6 @@ function M.combine_providers(providers)
 		local combined_messages = {}
 		for _, provider in ipairs(providers) do
 			local messages = provider()
-			print("MESSAGE", vim.inspect(messages))
 			for _, message in ipairs(messages) do
 				table.insert(combined_messages, message)
 			end

@@ -5,6 +5,7 @@ local context_picker = require("llm_search.context_picker")
 local context = require("llm_search.context")
 local io_utils = require("llm_search.io_utils")
 local highlights = require("llm_search.highlights")
+local tools = require("llm_search.tools")
 
 M.context_picker = context_picker.context_picker
 M.context = context
@@ -29,7 +30,11 @@ local function generic_llm_search(messages_supplier, output_func, model)
 			-- Show loading message
 			output_func.init(model, messages) -- Assume first message is context
 
-			model.provider.stream(model, messages, output_func.handle, output_func.finish)
+			local current_tools = nil
+			if model.supports_tool_use then
+				current_tools = tools.get_used_tools_list()
+			end
+			model.provider.stream(model, messages, output_func.handle, output_func.finish, current_tools)
 		else
 			print("No messages supplied")
 		end
@@ -176,6 +181,9 @@ M.ask_chat = build_action(ask_chat, DEFAULT_MODEL)
 M.ask_next_change = build_action(ask_next_change, DEFAULT_MODEL)
 M.init_new_chat = init_new_chat
 M.apply_changes = highlights.apply_diff_changes
+M.telescope_add_tool = tools.telescope_add_tool
+M.telescope_remove_tool = tools.telescope_remove_tool
+M.get_available_tools_list = tools.get_available_tools_list
 
 M.generic_action = function(opts)
 	local action = {

@@ -59,7 +59,6 @@ function M.stream(model, messages, callback, cleanup)
 			end
 		end
 	end
-	print(vim.inspect(body))
 	utils.run_curl_with_streaming({
 		url = M.api_url,
 		method = "POST",
