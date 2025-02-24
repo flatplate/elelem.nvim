@@ -60,18 +60,42 @@ function M.request(model, messages, callback)
 	messages = vim.tbl_filter(function(message)
 		return message.role ~= "system"
 	end, messages)
+
+	-- Set up headers with any beta headers if specified in the model
+	local headers = {
+		["Content-Type"] = "application/json",
+		["x-api-key"] = api_key,
+		["anthropic-version"] = "2023-06-01",
+	}
+
+	-- Add beta headers if specified in the model
+	if model.params and model.params.beta_headers then
+		for _, beta_header in ipairs(model.params.beta_headers) do
+			headers["anthropic-beta"] = beta_header
+		end
+	end
+
+	-- Prepare the request body
+	local body = {
+		model = model.name,
+		messages = messages,
+		max_tokens = 8192, -- default value
+		system = system_message and system_message.content or nil,
+	}
+
+	-- Override parameters from model.params if provided
+	if model.params then
+		-- Add any other parameters that might be in model.params
+		for key, value in pairs(model.params) do
+			if key ~= "beta_headers" then
+				body[key] = value
+			end
+		end
+	end
+
 	curl.post(M.api_url, {
-		headers = {
-			["Content-Type"] = "application/json",
-			["x-api-key"] = api_key,
-			["anthropic-version"] = "2023-06-01",
-		},
-		body = vim.fn.json_encode({
-			model = model.name,
-			messages = messages,
-			max_tokens = 8192,
-			system = system_message.content,
-		}),
+		headers = headers,
+		body = vim.fn.json_encode(body),
 		callback = vim.schedule_wrap(function(response)
 			if response.status ~= 200 then
 				vim.notify(
@@ -102,6 +126,12 @@ function M.stream(model, messages, callback, cleanup, tools, prev_system_message
 		"x-api-key: " .. api_key,
 		"anthropic-version: 2023-06-01",
 	}
+	-- Add beta headers if specified in the model
+	if model.params and model.params.beta_headers then
+		for _, beta_header in ipairs(model.params.beta_headers) do
+			table.insert(headers, "anthropic-beta: " .. beta_header)
+		end
+	end
 	local body = {
 		model = model.name,
 		messages = messages,
@@ -109,6 +139,15 @@ function M.stream(model, messages, callback, cleanup, tools, prev_system_message
 		stream = true,
 		system = system_message.content,
 	}
+	-- Override parameters from model.params if provided
+	if model.params then
+		-- Add any other parameters that might be in model.params
+		for key, value in pairs(model.params) do
+			if key ~= "beta_headers" then
+				body[key] = value
+			end
+		end
+	end
 	-- Add tools to the request if provided
 	if tools then
 		body.tools = format_tools(tools)

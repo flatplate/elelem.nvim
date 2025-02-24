@@ -79,6 +79,23 @@ M.claude_3_7_sonnet = {
 	supports_tool_use = true,
 }
 
+M.claude_3_7_sonnet_thinking = {
+	name = "claude-3-7-sonnet-20250219",
+	provider = providers.anthropic,
+	supports_system_message = true,
+	supports_tool_use = true,
+	-- Add parameter overrides
+	params = {
+		max_tokens = 128000,
+		thinking = {
+			type = "enabled",
+			budget_tokens = 32000,
+		},
+		-- Add any beta header info as special field
+		beta_headers = { "output-128k-2025-02-19" },
+	},
+}
+
 M.claude_3_haiku = {
 	name = "claude-3-haiku-20240307",
 	provider = providers.anthropic,
@@ -187,6 +204,8 @@ M.by_provider = {
 	anthropic = {
 		M.claude_3_opus,
 		M.claude_3_5_sonnet,
+		M.claude_3_7_sonnet,
+		M.claude_3_7_sonnet_thinking, -- Add the new model here
 		M.claude_2,
 	},
 	openai = {
