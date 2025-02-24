@@ -72,6 +72,13 @@ M.claude_3_5_sonnet = {
 	supports_tool_use = true,
 }
 
+M.claude_3_7_sonnet = {
+	name = "claude-3-7-sonnet-latest",
+	provider = providers.anthropic,
+	supports_system_message = true,
+	supports_tool_use = true,
+}
+
 M.claude_3_haiku = {
 	name = "claude-3-haiku-20240307",
 	provider = providers.anthropic,
