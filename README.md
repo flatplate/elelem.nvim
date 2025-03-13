@@ -91,6 +91,13 @@ elelem.setup({
   tools = {
     enable = true,             -- Enable tool use features when supported by models (default: true)
     require_confirmation = true, -- Require user confirmation before applying file changes (default: true)
+    default_tools = {          -- List of tools to enable automatically at startup
+      "replace",               -- For replacing code with diff preview
+      "replace_with_diff",     -- For replacing entire files
+      "cli",                   -- For executing terminal commands
+      "lsp_fix"                -- For LSP-based fixes
+    },
+    verbose = false            -- Set to true to show tool initialization messages
   }
 })
 ```
@@ -273,6 +280,51 @@ elelem.nvim provides access to many recent models across different providers:
 - `models.deepseek_r1_llama_70b`: DeepSeek r1 Distill Llama 70B (with tool use)
 
 Models with `supports_tool_use = true` can interact with your environment through the plugin's tool system, allowing for more powerful code editing capabilities.
+
+### Available Tools
+
+The following tools can be enabled for LLM use:
+
+- `replace`: Smart code replacement with diff preview and whitespace normalization
+- `replace_with_diff`: Replace entire files with diff preview
+- `replace_by_lines`: Replace specific line ranges in files
+- `cli`: Execute shell commands with security checks
+- `lsp_fix`: Fix diagnostics using LSP
+
+#### Tool Management
+
+You can manage tools programmatically:
+
+```lua
+-- Add tools individually
+require('elelem').add_tool("replace")
+require('elelem').add_tool("cli")
+
+-- Remove tools
+require('elelem').remove_tool("cli")
+
+-- Get list of currently enabled tools
+local active_tools = require('elelem').get_used_tools()
+
+-- Show available and enabled tools in console
+require('elelem').debug_print_tools()
+
+-- Open interactive tool selector
+require('elelem').telescope_add_tool()
+require('elelem').telescope_remove_tool()
+```
+
+Or configure them to load automatically at startup (recommended):
+
+```lua
+elelem.setup({
+  -- Other configuration...
+  tools = {
+    default_tools = { "replace", "replace_with_diff", "cli", "lsp_fix" },
+    verbose = true  -- Show initialization messages
+  }
+})
+```
 
 ## Logging
 

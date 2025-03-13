@@ -181,10 +181,14 @@ M.ask_chat = build_action(ask_chat, DEFAULT_MODEL)
 M.ask_next_change = build_action(ask_next_change, DEFAULT_MODEL)
 M.init_new_chat = init_new_chat
 M.apply_changes = highlights.apply_diff_changes
+-- Expose tool management functions at the top level
 M.telescope_add_tool = tools.telescope_add_tool
 M.telescope_remove_tool = tools.telescope_remove_tool
 M.get_available_tools_list = tools.get_available_tools_list
 M.debug_print_tools = tools.debug_print_tools
+M.add_tool = tools.add_tool
+M.remove_tool = tools.remove_tool
+M.get_used_tools = tools.get_used_tools_list
 
 M.generic_action = function(opts)
 	local action = {
@@ -233,6 +237,27 @@ M.setup = function(opts)
 	_G.elelem_options = {
 		show_diffs = opts.show_diffs == nil and true or opts.show_diffs, -- Default to true
 	}
+	
+	-- Initialize default tools if specified in config
+	if opts.tools and opts.tools.default_tools and type(opts.tools.default_tools) == "table" then
+		vim.schedule(function()
+			-- Allow a short delay for all plugin components to initialize
+			for _, tool_name in ipairs(opts.tools.default_tools) do
+				tools.add_tool(tool_name)
+				if opts.tools.verbose then
+					print("elelem.nvim: Added default tool: " .. tool_name)
+				end
+			end
+			
+			-- Show a summary of enabled tools if verbose
+			if opts.tools.verbose then
+				local enabled_tools = vim.tbl_keys(tools.used_tools)
+				if #enabled_tools > 0 then
+					print("elelem.nvim: Enabled tools: " .. table.concat(enabled_tools, ", "))
+				end
+			end
+		end)
+	end
 end
 
 M.models = models
