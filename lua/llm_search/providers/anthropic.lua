@@ -25,21 +25,24 @@ local function handle_tool_calls(tool_calls, tools, output_callback, final_callb
 	for _, call in ipairs(tool_calls) do
 		for _, tool in ipairs(tools) do
 			if call.name == tool.name then
+				-- First, add tool call message to the chat
+				local call_args
+				if type(call.arguments) == "table" then
+					call_args = vim.inspect(call.arguments)
+				else
+					call_args = tostring(call.arguments)
+				end
+				output_callback("\n\n[Tool Call]: " .. call.name .. "\n```json\n" .. call_args .. "\n```")
+				
+				-- Execute the tool
 				tool.handler(call.arguments, function(response)
 					responses[call.id] = response
+					
+					-- Add tool response to the chat
+					output_callback("\n\n[Tool Response]: " .. call.name .. "\n" .. response)
+					
 					pending = pending - 1
 					if pending == 0 then
-						-- Add tool results to output handler first
-						local tool_output = {}
-						for tool_id, resp in pairs(responses) do
-							local tool_name = call.name -- You might need to modify this to get actual tool name
-							table.insert(
-								tool_output,
-								string.format("\nTool %q result:\n%s", tool_name, vim.inspect(resp))
-							)
-						end
-						output_callback(table.concat(tool_output, "\n"))
-
 						-- Then proceed with final callback
 						final_callback(responses)
 					end

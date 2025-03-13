@@ -331,6 +331,80 @@ function M.apply_diff_changes()
 	})
 end
 
+-- Generate a unified diff between two strings
+function M.generate_diff(old_text, new_text)
+	-- Create temporary files for the old and new content
+	local old_file = vim.fn.tempname()
+	local new_file = vim.fn.tempname()
+	
+	-- Write content to temporary files
+	local old_handle = io.open(old_file, "w")
+	old_handle:write(old_text)
+	old_handle:close()
+	
+	local new_handle = io.open(new_file, "w")
+	new_handle:write(new_text)
+	new_handle:close()
+	
+	-- Run diff command
+	local diff_cmd = string.format("diff -u %s %s", vim.fn.shellescape(old_file), vim.fn.shellescape(new_file))
+	local diff_result = vim.fn.system(diff_cmd)
+	
+	-- Clean up temporary files
+	os.remove(old_file)
+	os.remove(new_file)
+	
+	-- Return the diff output
+	return diff_result
+end
+
+-- Format a colorized diff string for display in confirmation dialog
+function M.format_colorized_diff(old_text, new_text, max_lines)
+	-- Split texts into lines
+	local old_lines = vim.split(old_text, "\n")
+	local new_lines = vim.split(new_text, "\n")
+	
+	-- Calculate line-by-line diffs
+	local result = {}
+	local shown_lines = 0
+	local max_to_show = max_lines or 20 -- Default to showing 20 lines
+	
+	-- Custom highlight groups for terminal output
+	local colors = {
+		remove = "\27[31m", -- Red for removals
+		add = "\27[32m",    -- Green for additions
+		context = "\27[90m", -- Gray for context
+		reset = "\27[0m"    -- Reset formatting
+	}
+	
+	-- Show a few lines of context before the diff
+	local context_lines = 2
+	local start_idx = math.max(1, #old_lines - max_to_show)
+	
+	-- Add header
+	table.insert(result, colors.context .. "--- Old version" .. colors.reset)
+	table.insert(result, colors.context .. "+++ New version" .. colors.reset)
+	shown_lines = shown_lines + 2
+	
+	-- Add removed lines
+	for i, line in ipairs(old_lines) do
+		if shown_lines >= max_to_show then break end
+		if i >= start_idx then
+			table.insert(result, colors.remove .. "- " .. line .. colors.reset)
+			shown_lines = shown_lines + 1
+		end
+	end
+	
+	-- Add added lines
+	for _, line in ipairs(new_lines) do
+		if shown_lines >= max_to_show then break end
+		table.insert(result, colors.add .. "+ " .. line .. colors.reset)
+		shown_lines = shown_lines + 1
+	end
+	
+	return table.concat(result, "\n")
+end
+
 function M.setup()
 	setup_highlights()
 

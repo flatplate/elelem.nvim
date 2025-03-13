@@ -27,6 +27,40 @@ function M.find_position_from_snippet(file_content, marked_snippet)
 	}
 end
 
+function M.get_diagnostics_at_file(file_path, callback)
+	vim.schedule(function()
+		local file_exists = vim.fn.filereadable(file_path) == 1
+		if not file_exists then
+			vim.schedule(function()
+				callback("File not found", nil)
+			end)
+			return
+		end
+
+		print("File exists: ", file_path)
+
+		local bufnr = vim.fn.bufnr(file_path, true)
+		vim.fn.bufload(bufnr)
+
+		local params = {
+			textDocument = { uri = vim.uri_from_fname(file_path) },
+		}
+		-- print available lsp methods
+		print(
+			"DIAGNOSTICS",
+			vim.inspect(vim.lsp.get_clients({
+				bufnr = bufnr,
+			}))
+		)
+
+		vim.lsp.buf_request(bufnr, "textDocument/diagnostic", params, function(err, result)
+			vim.schedule(function()
+				callback(err, result)
+			end)
+		end)
+	end)
+end
+
 function M.get_definition_at_snippet(file_path, marked_snippet, callback)
 	vim.schedule(function()
 		-- 1. File check in main thread
@@ -129,6 +163,28 @@ function M.debug_definition_to_clipboard()
 		local result_str = vim.inspect(result)
 		vim.fn.setreg("*", vim.inspect(err) .. "    " .. result_str)
 		print("Definition result copied to clipboard register (*)")
+	end)
+end
+
+function M.debug_diagnostics_to_clipboard()
+	local current_file = vim.fn.expand("%:p")
+	local bufnr = vim.fn.bufnr()
+	local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
+
+	print("Requesting diagnostics..., params: ", vim.inspect(params))
+
+	vim.lsp.buf_request(bufnr, "textDocument/diagnostic", params, function(err, result)
+		local output = {
+			"Diagnostics Debug Info:",
+			"File: " .. current_file,
+			"\nError:",
+			vim.inspect(err),
+			"\nResult:",
+			vim.inspect(result),
+		}
+		local result_str = table.concat(output, "\n")
+		vim.fn.setreg("*", result_str)
+		print("Diagnostic result copied to clipboard register (*)")
 	end)
 end
 

@@ -129,6 +129,12 @@ M.gpt4o = {
 	supports_system_message = true,
 }
 
+M.o3_mini = {
+	name = "o3-mini-2025-01-31",
+	provider = providers.openai,
+	supports_system_message = true,
+}
+
 -- Groq models
 
 M.llama_3_1_405B = {
@@ -138,9 +144,10 @@ M.llama_3_1_405B = {
 }
 
 M.llama_3_1_70B = {
-	name = "llama-3.1-70b-versatile",
+	name = "llama-3.3-70b-versatile",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.llama_3_1_8B = {
@@ -153,41 +160,54 @@ M.llama_3_groq_70B = {
 	name = "llama3-groq-70b-8192-tool-use-preview",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 M.llama_3_groq_8B = {
 	name = "llama3-groq-8b-8192-tool-use-preview",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.meta_llama_3_70B = {
 	name = "llama3-70b-8192",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.meta_llama_3_8B = {
 	name = "llama3-8b-8192",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.mixtral_8x7B = {
 	name = "mixtral-8x7b-32768",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.gemma_7B = {
 	name = "gemma-7b-it",
 	provider = providers.groq,
 	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 M.gemma_2_9B = {
 	name = "gemma2-9b-it",
 	provider = providers.groq,
 	supports_system_message = true,
+}
+
+M.deepseek_r1_llama_70b = {
+	name = "deepseek-r1-distill-llama-70b",
+	provider = providers.groq,
+	supports_system_message = true,
+	supports_tool_use = true,
 }
 
 -- Models by provider

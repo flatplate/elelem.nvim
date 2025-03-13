@@ -13,8 +13,19 @@ elelem.nvim is a powerful Neovim plugin that integrates Large Language Models (L
 - Query visual selections
 - Append LLM-generated content to your code
 - Support for multiple providers and models
+- Visual diffs in floating windows when modifying files
 - Customizable prompts
 - Logging for debugging
+- LSP integration for diagnostics, definitions, and references
+- Tool use support for advanced AI capabilities:
+  - CLI command execution with security checks
+  - File manipulation with diff previews and confirmations
+  - Smart code replacement with whitespace normalization
+- Support for the latest LLM models:
+  - Claude 3.5 Sonnet and Haiku with tool use
+  - Llama 3.1 models via Fireworks and Groq
+  - DeepSeek-r1 and DeepSeek v3
+  - Gemma 2 models
 
 ## Installation
 
@@ -60,7 +71,26 @@ elelem.setup({
     },
     openai = {
       api_key = env_vars.OPENAI_API_KEY
+    },
+    groq = {
+      api_key = env_vars.GROQ_API_KEY
     }
+  },
+  
+  -- UI options
+  show_diffs = true, -- Show diffs in a floating window when files are modified (default: true)
+  
+  -- LSP integration
+  lsp = {
+    enable_diagnostics = true, -- Enable gathering LSP diagnostics in context (default: true)
+    enable_definitions = true, -- Enable gathering symbol definitions in context (default: true)
+    enable_references = true,  -- Enable gathering symbol references in context (default: true)
+  },
+  
+  -- Tool use options
+  tools = {
+    enable = true,             -- Enable tool use features when supported by models (default: true)
+    require_confirmation = true, -- Require user confirmation before applying file changes (default: true)
   }
 })
 ```
@@ -72,6 +102,8 @@ there is a better way let me know.
 ## Usage
 
 elelem.nvim provides several functions to interact with your code:
+
+### Basic Functions
 
 1. Search quickfix list:
    ```lua
@@ -98,31 +130,104 @@ elelem.nvim provides several functions to interact with your code:
    :lua require('elelem').append_llm_output_visual()
    ```
 
-My keymaps look like this
+### LSP Integration
+
+1. Get LSP diagnostics for current file:
+   ```lua
+   :lua require('elelem').get_diagnostics()
+   ```
+
+2. Find and fix issues with LSP diagnostics:
+   ```lua
+   :lua require('elelem').fix_diagnostics()
+   ```
+
+3. Find symbol definitions with LSP:
+   ```lua
+   :lua require('elelem').get_definition()
+   ```
+
+4. Find symbol references with LSP:
+   ```lua
+   :lua require('elelem').get_references()
+   ```
+
+### Tool Use Functions
+
+Tool use is automatically supported for compatible models like Claude 3.5 Sonnet/Haiku. The tools allow the AI to:
+
+- Execute CLI commands with user confirmation
+- Modify files with interactive diff previews  
+- Replace code with whitespace-aware matching
+- See changes before applying them
+
+When using a tool-enabled model, you'll get a UI prompt to confirm any changes before they're applied.
+
+### Example Keymapping Configuration
+
+Here's an example of comprehensive keymappings for both basic and advanced features:
 
 ```lua
-local gpt4omini = require("elelem").models.gpt4omini
-local claude_3_5_sonnet = require("elelem").models.claude_3_5_sonnet
--- Same as the comments below
+local elelem = require("elelem")
+
+-- Import models
+local gpt4omini = elelem.models.gpt4omini
+local claude_3_5_sonnet = elelem.models.claude_3_5_sonnet
+local llama_3_1_8B = elelem.models.llama_3_1_8B
+local deepseek_r1 = elelem.models.deepseek_r1
+
+-- Basic search functions
 vim.keymap.set('n', '<leader>wq', function()
   elelem.search_quickfix("Answer only what is asked short and concisely. Give references to the file names when you say something. ", gpt4omini)
-end, { desc = 'Search [W]ith [Q]uickfix' })
+end, { desc = 'Search with Quickfix (GPT-4o-mini)' })
+
 vim.keymap.set('n', '<leader>ww', function()
   elelem.search_current_file("Answer only what is asked short and concisely. ", gpt4omini)
-end, { desc = 'Query Current File' })
+end, { desc = 'Query Current File (GPT-4o-mini)' })
+
 vim.keymap.set('n', '<leader>we', function()
   elelem.search_current_file("", claude_3_5_sonnet)
-end, { desc = 'Query Current File with sonnet' })
-vim.keymap.set('n', '<leader>wa', function()
-  elelem.append_llm_output("You write code that will be put in the lines marked with [Append here] and write code for what the user asks. Do not provide any explanations, just write code. Only return code. Only code no explanation", claude_3_5_sonnet)
-end, { desc = 'Append to cursor location with sonnet' })
+end, { desc = 'Query Current File with Claude 3.5 Sonnet' })
 
+-- Code generation with tool use enabled model
+vim.keymap.set('n', '<leader>wa', function()
+  elelem.append_llm_output("You write code that will be put in the lines marked with [Append here]. Do not provide any explanations, just write code.", claude_3_5_sonnet)
+end, { desc = 'Append Code with Claude 3.5 Sonnet' })
+
+-- Visual selection operations
 vim.keymap.set('v', '<leader>we', function()
   elelem.search_visual_selection("", claude_3_5_sonnet)
-end, { desc = 'Query selection with sonnet' })
+end, { desc = 'Query Selection with Claude 3.5 Sonnet' })
+
 vim.keymap.set('v', '<leader>wa', function()
-  elelem.append_llm_output_visual("You write code that will be put in the lines marked with [Append here] and write code for what the user asks. Do not provide any explanations, just write code. Only return code. Only code no explanation", claude_3_5_sonnet)
-end, { desc = 'Append selection with sonnet' })
+  elelem.append_llm_output_visual("You write code that will be put in the lines marked with [Append here]. Do not provide explanations.", claude_3_5_sonnet)
+end, { desc = 'Append to Selection with Claude 3.5 Sonnet' })
+
+-- LSP features
+vim.keymap.set('n', '<leader>wd', function()
+  elelem.get_diagnostics(claude_3_5_sonnet)
+end, { desc = 'Get LSP Diagnostics with Claude 3.5 Sonnet' })
+
+vim.keymap.set('n', '<leader>wf', function()
+  elelem.fix_diagnostics(claude_3_5_sonnet)
+end, { desc = 'Fix LSP Issues with Claude 3.5 Sonnet' })
+
+vim.keymap.set('n', '<leader>ws', function()
+  elelem.get_definition(claude_3_5_sonnet)
+end, { desc = 'Get Symbol Definition with Claude 3.5 Sonnet' })
+
+vim.keymap.set('n', '<leader>wr', function()
+  elelem.get_references(claude_3_5_sonnet)
+end, { desc = 'Get Symbol References with Claude 3.5 Sonnet' })
+
+-- Quick model switching examples
+vim.keymap.set('n', '<leader>wl', function()
+  elelem.search_current_file("", llama_3_1_8B)
+end, { desc = 'Query with Llama 3.1 8B' })
+
+vim.keymap.set('n', '<leader>wk', function()
+  elelem.search_current_file("", deepseek_r1)
+end, { desc = 'Query with DeepSeek-r1' })
 ```
 
 ## Custom Prompts and Models
@@ -130,8 +235,44 @@ end, { desc = 'Append selection with sonnet' })
 You can specify custom prompts and models for each function:
 
 ```lua
-:lua require('elelem').search_quickfix("Your custom prompt", require('elelem').models.gpt4)
+:lua require('elelem').search_quickfix("Your custom prompt", require('elelem').models.claude_3_5_sonnet)
 ```
+
+### Available Models
+
+elelem.nvim provides access to many recent models across different providers:
+
+#### Anthropic Models
+- `models.claude_3_opus`: Claude 3 Opus
+- `models.claude_3_5_sonnet`: Claude 3.5 Sonnet (with tool use)
+- `models.claude_3_haiku`: Claude 3 Haiku
+- `models.claude_3_5_haiku`: Claude 3.5 Haiku (with tool use)
+- `models.claude_2`: Claude 2.1
+
+#### OpenAI Models
+- `models.gpt4omini`: GPT-4o-mini
+- `models.gpt4o`: GPT-4o
+- `models.o3_mini`: o3-mini
+
+#### Fireworks Models
+- `models.deepseek`: DeepSeek Coder v2 Lite
+- `models.deepseek_base`: DeepSeek Coder v2
+- `models.deepseek_3`: DeepSeek v3
+- `models.deepseek_r1`: DeepSeek r1
+- `models.gemma`: Gemma 2 9B
+- `models.llama_3_1_405B_fireworks`: Llama 3.1 405B
+- `models.llama_3_1_70B_fireworks`: Llama 3.1 70B
+- `models.llama_3_1_8B_fireworks`: Llama 3.1 8B
+- `models.qwen`: Qwen 2.5 72B
+
+#### Groq Models
+- `models.llama_3_1_405B`: Llama 3.1 405B
+- `models.llama_3_1_70B`: Llama 3.3 70B (with tool use)
+- `models.llama_3_1_8B`: Llama 3.1 8B
+- `models.gemma_2_9B`: Gemma 2 9B
+- `models.deepseek_r1_llama_70b`: DeepSeek r1 Distill Llama 70B (with tool use)
+
+Models with `supports_tool_use = true` can interact with your environment through the plugin's tool system, allowing for more powerful code editing capabilities.
 
 ## Logging
 

@@ -8,7 +8,11 @@ return {
 				method = {
 					type = "string",
 					description = "LSP method to execute (e.g. textDocument/definition)",
-					enum = { "textDocument/definition", "textDocument/references" },
+					enum = {
+						"textDocument/definition",
+						"textDocument/references",
+						"textDocument/diagnostic", -- Added new method
+					},
 				},
 				file_path = {
 					type = "string",
@@ -24,14 +28,33 @@ return {
 				},
 				marked_snippet = {
 					type = "string",
-					description = "Code snippet with § markers around the target symbol",
+					description = "Code snippet with § markers around the target symbol. Required for textDocument/definition and textDocument/references. You need to have § markers around the symbol you want to look up.",
 				},
 			},
-			required = { "method", "file_path", "marked_snippet" },
+			required = { "method", "file_path" },
 		},
 		handler = function(args, callback)
+			print("Executing LSP query with args:", vim.inspect(args))
 			local lsp = require("llm_search.context_suppliers.lsp")
 
+			local function process_diagnostics(results)
+				local formatted = {}
+				for _, diagnostic in ipairs(results) do
+					local range = diagnostic.range or {}
+					local start = range.start or {}
+					local send = range["end"] or {}
+					formatted[#formatted + 1] = string.format(
+						"[%s] Line %d:%d - %d:%d: %s",
+						diagnostic.severity and vim.diagnostic.severity[diagnostic.severity] or "UNKNOWN",
+						start.line + 1,
+						start.character + 1,
+						send.line + 1,
+						send.character + 1,
+						diagnostic.message
+					)
+				end
+				return formatted
+			end
 			local function process_results(result, options)
 				local pending = 0
 				local results = {}
@@ -96,7 +119,15 @@ return {
 											local filetype = vim.filetype.match({ filename = file_path_abs })
 											local lang = filetype and vim.treesitter.language.get_lang(filetype) or nil
 											if not lang then
-												snippet = "<Unable to determine language>"
+												local start_row = range.start.line -- 0-based
+												local start_0 = math.max(start_row - 100, 0)
+												local end_0 = math.min(start_row + 100, #content - 1)
+												local lines = {}
+												for i = start_0, end_0 do
+													local line = content[i + 1] -- 0-based to 1-based
+													table.insert(lines, line)
+												end
+												snippet = table.concat(lines, "\n")
 											else
 												local ok, parent_stat_node = pcall(function()
 													local parser = vim.treesitter.get_string_parser(data, lang)
@@ -237,7 +268,23 @@ return {
 					::continue::
 				end
 			end
-			if args.method == "textDocument/definition" then
+			if args.method == "textDocument/diagnostic" then
+				lsp.get_diagnostics_at_file(args.file_path, function(err, result)
+					if err then
+						return callback("LSP Error: " .. tostring(err))
+					end
+					if not result or vim.tbl_isempty(result) then
+						return callback("No diagnostics found")
+					end
+
+					local diagnostics = process_diagnostics(result)
+					if #diagnostics == 0 then
+						return callback("No diagnostics found in file")
+					end
+
+					callback("Diagnostics in " .. args.file_path .. ":\n" .. table.concat(diagnostics, "\n"))
+				end)
+			elseif args.method == "textDocument/definition" then
 				lsp.get_definition_at_snippet(args.file_path, args.marked_snippet, function(err, result)
 					if err then
 						return callback("LSP Error: " .. tostring(err))
@@ -258,7 +305,10 @@ return {
 					end
 					process_results(result, args.options)
 				end)
+			elseif args.method == "textDocument/diagnostic" then
+				process_diagnostics()
 			else
+				print("Unsupported LSP method: " .. vim.inspect(args))
 				callback("Unsupported LSP method: " .. (args.method or ""))
 			end
 		end,

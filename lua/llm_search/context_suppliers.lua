@@ -56,7 +56,7 @@ end
 
 function M.from_git_diff()
 	-- Execute git diff with maximum context lines
-	local handle = io.popen("git diff --unified=9999 2>&1")
+	local handle = io.popen("git diff HEAD --unified=9999 2>&1")
 	if not handle then
 		vim.notify("Failed to execute git diff", vim.log.levels.ERROR)
 		return { create_message("user", "") }

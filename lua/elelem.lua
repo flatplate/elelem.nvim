@@ -184,6 +184,7 @@ M.apply_changes = highlights.apply_diff_changes
 M.telescope_add_tool = tools.telescope_add_tool
 M.telescope_remove_tool = tools.telescope_remove_tool
 M.get_available_tools_list = tools.get_available_tools_list
+M.debug_print_tools = tools.debug_print_tools
 
 M.generic_action = function(opts)
 	local action = {
@@ -223,9 +224,15 @@ function M.open_log_file()
 end
 
 M.setup = function(opts)
+	opts = opts or {}
 	config = opts
 	highlights.setup()
 	providers.set_config(opts)
+	
+	-- Store user options
+	_G.elelem_options = {
+		show_diffs = opts.show_diffs == nil and true or opts.show_diffs, -- Default to true
+	}
 end
 
 M.models = models
