@@ -4,16 +4,28 @@ local utils = require("llm_search.providers.utils")
 local M = {}
 
 M.api_url = "https://api.anthropic.com/v1/messages"
+M.cache_enabled = true
 
--- Helper function to format tools for Anthropic API
-local function format_tools(tools)
+-- Helper function to format tools for Anthropic API with caching
+local function format_tools(tools, should_cache)
+	if not tools or #tools == 0 then
+		return {}
+	end
+	
 	local formatted_tools = {}
-	for _, tool in ipairs(tools) do
-		table.insert(formatted_tools, {
+	for i, tool in ipairs(tools) do
+		local formatted_tool = {
 			name = tool.name,
 			description = tool.description,
 			input_schema = tool.input_schema,
-		})
+		}
+		
+		-- Add cache_control to the last tool if caching is enabled
+		if should_cache and i == #tools then
+			formatted_tool.cache_control = { type = "ephemeral" }
+		end
+		
+		table.insert(formatted_tools, formatted_tool)
 	end
 	return formatted_tools
 end
@@ -78,12 +90,36 @@ function M.request(model, messages, callback)
 		end
 	end
 
+	-- Format system message with caching
+	local formatted_system = nil
+	if system_message then
+		if M.cache_enabled and system_message.content and system_message.content ~= "" then
+			-- For caching, we need to convert the system message into an array format
+			formatted_system = {
+				{
+					type = "text",
+					text = system_message.content,
+					cache_control = { type = "ephemeral" }
+				}
+			}
+		else
+			-- Regular system message (string format) when caching is disabled
+			formatted_system = system_message.content
+		end
+	end
+
+	-- Format messages with caching if enabled
+	local formatted_messages = messages
+	if M.cache_enabled then
+		formatted_messages = format_messages(messages, true)
+	end
+
 	-- Prepare the request body
 	local body = {
 		model = model.name,
-		messages = messages,
+		messages = formatted_messages,
 		max_tokens = 8192, -- default value
-		system = system_message and system_message.content or nil,
+		system = formatted_system,
 	}
 
 	-- Override parameters from model.params if provided
@@ -113,6 +149,51 @@ function M.request(model, messages, callback)
 	})
 end
 
+-- Helper function to format messages with caching
+local function format_messages(messages, should_cache)
+	if not messages or #messages == 0 then
+		return messages
+	end
+	
+	local formatted_messages = vim.deepcopy(messages)
+	
+	-- Find the last user message to apply caching
+	if should_cache then
+		local last_user_msg_idx = nil
+		for i = #formatted_messages, 1, -1 do
+			if formatted_messages[i].role == "user" then
+				last_user_msg_idx = i
+				break
+			end
+		end
+		
+		-- If we found a user message, convert its content for caching if it's a simple string
+		if last_user_msg_idx then
+			local msg = formatted_messages[last_user_msg_idx]
+			
+			-- Convert simple string content to array format with cache_control
+			if type(msg.content) == "string" then
+				msg.content = {
+					{
+						type = "text",
+						text = msg.content,
+						cache_control = { type = "ephemeral" }
+					}
+				}
+			-- Handle content that's already an array
+			elseif type(msg.content) == "table" and #msg.content > 0 then
+				-- Add cache_control to the last content block
+				local last_content = msg.content[#msg.content]
+				if type(last_content) == "table" and last_content.type == "text" then
+					last_content.cache_control = { type = "ephemeral" }
+				end
+			end
+		end
+	end
+	
+	return formatted_messages
+end
+
 function M.stream(model, messages, callback, cleanup, tools, prev_system_message)
 	local api_key = M.config.providers.anthropic.api_key
 	-- Get the system message
@@ -135,12 +216,37 @@ function M.stream(model, messages, callback, cleanup, tools, prev_system_message
 			table.insert(headers, "anthropic-beta: " .. beta_header)
 		end
 	end
+	
+	-- Format system message with caching
+	local formatted_system = nil
+	if system_message then
+		if M.cache_enabled and system_message.content and system_message.content ~= "" then
+			-- For caching, we need to convert the system message into an array format
+			formatted_system = {
+				{
+					type = "text",
+					text = system_message.content,
+					cache_control = { type = "ephemeral" }
+				}
+			}
+		else
+			-- Regular system message (string format) when caching is disabled
+			formatted_system = system_message.content
+		end
+	end
+	
+	-- Format messages with caching if enabled
+	local formatted_messages = messages
+	if M.cache_enabled then
+		formatted_messages = format_messages(messages, true)
+	end
+	
 	local body = {
 		model = model.name,
-		messages = messages,
+		messages = formatted_messages,
 		max_tokens = 8192,
 		stream = true,
-		system = system_message.content,
+		system = formatted_system,
 	}
 	-- Override parameters from model.params if provided
 	if model.params then
@@ -153,7 +259,7 @@ function M.stream(model, messages, callback, cleanup, tools, prev_system_message
 	end
 	-- Add tools to the request if provided
 	if tools then
-		body.tools = format_tools(tools)
+		body.tools = format_tools(tools, M.cache_enabled)
 	end
 
 	-- State tracking for tool calls
@@ -286,6 +392,20 @@ end
 
 function M.set_config(config)
 	M.config = config
+	-- Set caching based on config if provided
+	if config and config.providers and config.providers.anthropic and config.providers.anthropic.cache_prompts ~= nil then
+		M.cache_enabled = config.providers.anthropic.cache_prompts
+	end
+end
+
+-- Function to enable or disable caching
+function M.toggle_cache(enabled)
+	if enabled ~= nil then
+		M.cache_enabled = enabled
+	else
+		M.cache_enabled = not M.cache_enabled
+	end
+	return M.cache_enabled
 end
 
 return M

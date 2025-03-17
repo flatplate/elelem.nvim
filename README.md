@@ -16,6 +16,7 @@ elelem.nvim is a powerful Neovim plugin that integrates Large Language Models (L
 - Visual diffs in floating windows when modifying files
 - Customizable prompts
 - Logging for debugging
+- Prompt caching for Claude models to reduce token usage and costs
 - LSP integration for diagnostics, definitions, and references
 - Tool use support for advanced AI capabilities:
   - CLI command execution with security checks
@@ -67,7 +68,8 @@ elelem.setup({
       api_key = env_vars.FIREWORKS_API_KEY
     },
     anthropic = {
-      api_key = env_vars.ANTHROPIC_API_KEY
+      api_key = env_vars.ANTHROPIC_API_KEY,
+      cache_prompts = true -- Enable prompt caching for Claude models (default: true)
     },
     openai = {
       api_key = env_vars.OPENAI_API_KEY
@@ -333,6 +335,61 @@ To view the log file:
 ```lua
 :lua require('elelem').open_log_file()
 ```
+
+## Prompt Caching
+
+elelem.nvim supports Claude's prompt caching feature, which reduces token usage by caching system messages, tool definitions, and multi-turn conversations. This reduces costs and improves response times for repetitive queries with the same context.
+
+### Configuration
+
+Enable or disable caching in your setup:
+
+```lua
+elelem.setup({
+  providers = {
+    anthropic = {
+      api_key = env_vars.ANTHROPIC_API_KEY,
+      cache_prompts = true -- Enable or disable prompt caching (default: true)
+    },
+    -- other providers...
+  },
+  -- other options...
+})
+```
+
+### Programmatic Control
+
+You can also control caching programmatically:
+
+```lua
+-- Get the Anthropic provider
+local anthropic = require('llm_search.providers.anthropic')
+
+-- Enable caching
+anthropic.toggle_cache(true)
+
+-- Disable caching
+anthropic.toggle_cache(false)
+
+-- Toggle caching (switches between enabled/disabled)
+anthropic.toggle_cache()
+
+-- Check current status
+local is_enabled = anthropic.cache_enabled
+```
+
+### How Caching Works
+
+The caching implementation:
+
+1. **System Messages**: The system prompt is cached with the `cache_control` parameter
+2. **Tool Definitions**: When tools are used, the last tool definition gets the `cache_control` parameter, caching all tools
+3. **Multi-turn Conversations**: In chat mode, the last user message is configured for caching
+
+This approach follows Claude's recommended practices for efficient prompt caching, resulting in:
+- Lower costs (cached tokens are 90% cheaper than regular input tokens)
+- Faster responses (cached content doesn't need to be reprocessed by the model)
+- Better user experience in chat interfaces
 
 ## License
 
